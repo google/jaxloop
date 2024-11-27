@@ -1,0 +1,46 @@
+# How to Contribute
+
+As a new and growing community of JAX developers, we appreciate and welcome contributions to jaxloop!
+
+If you're interested in getting started, the following sections might help you set up your environement and get started contributing.
+
+## Before you begin
+
+### Sign our Contributor License Agreement
+
+Contributions to this project must be accompanied by a
+[Contributor License Agreement](https://cla.developers.google.com/about) (CLA).
+You (or your employer) retain the copyright to your contribution; this simply
+gives us permission to use and redistribute your contributions as part of the
+project.
+
+If you or your current employer have already signed the Google CLA (even if it
+was for a different project), you probably don't need to do it again.
+
+Visit <https://cla.developers.google.com/> to see your current agreements or to
+sign a new one.
+
+### Review our Community Guidelines
+
+This project follows [Google's Open Source Community
+Guidelines](https://opensource.google/conduct/).
+
+## Contribution process
+
+1.  [File an issue](https://github.com/google/jaxloop/issues/new) or find an existing one to track your
+    contribution.*
+2.  Create a branch to contain your changes.
+3.  [Create a pull request](https://github.com/google/jaxloop/compare/main...your-branch-name) and wait for a review. Typically, we will review all PRs within 5 business days.
+4.  Once your pull request has been approved, merge it into the main branch.
+5.  Celebrate! You've contributed to the project!
+
+* It is a good idea to file an issue before beginning any work, so that we can make sure your contribution aligns with the goals of jaxloop and keeps our library clean for everyone!
+
+Along the way, if you have any questions, you can reach out to the
+[jaxloop team](mailto:jaxloop-team@google.com) either via email or through the issues/PRs directly.
+
+### Code Reviews
+
+All submissions, including submissions by project members, require review. We
+use [GitHub pull requests](https://docs.github.com/articles/about-pull-requests)
+for this purpose.
