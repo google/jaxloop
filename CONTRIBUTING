@@ -27,10 +27,10 @@ Guidelines](https://opensource.google/conduct/).
 
 ## Contribution process
 
-1.  [File an issue](https://github.com/google/jaxloop/issues/new) or find an existing one to track your
+1.  [File an issue](https://github.com/jax-ml/jaxloop/issues/new) or find an existing one to track your
     contribution.*
 2.  Create a branch to contain your changes.
-3.  [Create a pull request](https://github.com/google/jaxloop/compare/main...your-branch-name) and wait for a review. Typically, we will review all PRs within 5 business days.
+3.  [Create a pull request](https://github.com/jax-ml/jaxloop/compare/main...your-branch-name) and wait for a review. Typically, we will review all PRs within 5 business days.
 4.  Once your pull request has been approved, merge it into the main branch.
 5.  Celebrate! You've contributed to the project!
 
