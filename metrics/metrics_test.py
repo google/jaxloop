@@ -70,6 +70,26 @@ class MetricsTest(parameterized.TestCase):
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
+  def compute_aucpr(self, model_outputs):
+    metric = None
+    for model_output in model_outputs:
+      update = metrics.AUCPR.from_model_output(
+          predictions=model_output.get('logits'),
+          labels=model_output.get('labels'),
+      )
+      metric = update if metric is None else metric.merge(update)
+    return metric.compute()
+
+  def compute_aucroc(self, model_outputs):
+    metric = None
+    for model_output in model_outputs:
+      update = metrics.AUCROC.from_model_output(
+          predictions=model_output.get('logits'),
+          labels=model_output.get('labels'),
+      )
+      metric = update if metric is None else metric.merge(update)
+    return metric.compute()
+
   def test_precision(self):
     """Test that new Precision Metric computes correct values."""
     np.testing.assert_allclose(
@@ -110,6 +130,34 @@ class MetricsTest(parameterized.TestCase):
     np.testing.assert_allclose(
         self.compute_recall(self.model_outputs_batch_size_one),
         [0.5],
+    )
+
+  def test_aucpr(self):
+    """Test that new AUC-PR Metric computes correct values."""
+    np.testing.assert_allclose(
+        self.compute_aucpr(self.model_outputs),
+        jnp.array(0.5972222, dtype=jnp.float32),
+    )
+
+  def test_aucpr_with_batch_size_one(self):
+    """Test that new AUC-PR Metric computes correct values with batch size one."""
+    np.testing.assert_allclose(
+        self.compute_aucpr(self.model_outputs_batch_size_one),
+        jnp.array(0.875, dtype=jnp.float32),
+    )
+
+  def test_aucroc(self):
+    """Test that new AUC-ROC Metric computes correct values."""
+    np.testing.assert_allclose(
+        self.compute_aucroc(self.model_outputs),
+        jnp.array(0.046875, dtype=jnp.float32),
+    )
+
+  def test_aucroc_with_batch_size_one(self):
+    """Test that new AUC-ROC Metric computes correct values with batch size one."""
+    np.testing.assert_allclose(
+        self.compute_aucroc(self.model_outputs_batch_size_one),
+        [0],
     )
 
 
