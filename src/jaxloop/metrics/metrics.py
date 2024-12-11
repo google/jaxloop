@@ -182,9 +182,9 @@ class AUCPR(clu_metrics.Metric):
     false_negatives = pred_is_neg * label_is_pos
 
     return cls(
-        true_positives=true_positives.sum(axis=1),
-        false_positives=false_positives.sum(axis=1),
-        false_negatives=false_negatives.sum(axis=1),
+        true_positives=true_positives.sum(axis=-1),
+        false_positives=false_positives.sum(axis=-1),
+        false_negatives=false_negatives.sum(axis=-1),
     )
 
   def merge(self, other: 'AUCPR') -> 'AUCPR':
