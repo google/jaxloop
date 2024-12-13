@@ -6,14 +6,14 @@ practitioners to train, evaluate, and checkpoint [JAX] models.
 Jaxloop reduces boilerplate ML code to a standard set of modular components
 (outer and inner loops, batch train/eval steps, callback actions, data/compute
 partitioners) so that you can focus on modeling and experimentation. Jaxloop
-components enable both common and advanced tasks you may need, from writing
-summaries of metrics to distributed training ([more](#supported-tasks)).
+components enable both common and advanced needs, from writing summaries of
+metrics to distributed training ([more](#supported-tasks)) and advanced ML
+techniques.
 
-Fully control as many or as few aspects of the training loop using the JAX
+Fully control as many or as few aspects of the training loop, leveraging the JAX
 ecosystem libraries you already know (`flax`, `optax`, `orbax`, etc.).
 
 [JAX]: https://github.com/jax-ml/jax
-[Optax]: https://github.com/google-deepmind/optax
 
 ## Installation
 
@@ -23,12 +23,14 @@ You can get the latest stable version of Jaxloop via
 pip install -U jaxloop
 ```
 
+<!--
 To use the development version (or to test [contributions](CONTRIBUTING)), clone
 this repo and run
 
 ```
 ...
 ```
+-->
 
 ## Supported tasks
 
@@ -36,14 +38,12 @@ Jaxloop includes a growing list of out-of-box features.
 
 * Highly customizable **training loop**
 * Automatic model **evaluation**
-* Pre/post-processing **actions** every given number of train/eval batches or
-  epochs
-  + Metric aggregation
-  + Summary writing (reports, logging)
+* Epoch-level **actions** (every given number of train/eval steps)
+  + Metric aggregation and summary writing (reports, logging)
   + Loading or exporting model checkpoints
-  + Etc.
-* Built-in **partitioners** for distributed/accelerated training on different
-  device topologies (CPU, GPU, and TPU)
+  + Advanced ML techniques e.g. learning rate scheduling, early stopping, etc.
+* Built-in **partitioners** for distributed data processing and training on
+  different device topologies (CPU, GPU, and TPU)
 
 ## Basic usage
 
