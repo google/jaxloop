@@ -104,74 +104,122 @@ class MetricsTest(parameterized.TestCase):
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
+  def compute_mse(self, model_outputs):
+    metric = None
+    for model_output in model_outputs:
+      update = metrics.MSE.from_model_output(
+          predictions=model_output.get('logits'),
+          labels=model_output.get('labels'),
+      )
+      metric = update if metric is None else metric.merge(update)
+    return metric.compute()
+
+  def compute_rmse(self, model_outputs):
+    metric = None
+    for model_output in model_outputs:
+      update = metrics.RMSE.from_model_output(
+          predictions=model_output.get('logits'),
+          labels=model_output.get('labels'),
+      )
+      metric = update if metric is None else metric.merge(update)
+    return metric.compute()
+
   def test_precision(self):
-    """Test that new Precision Metric computes correct values."""
+    """Test that Precision Metric computes correct values."""
     np.testing.assert_allclose(
         self.compute_precision(self.model_outputs),
         [2 / 3],
     )
 
   def test_precision_at_0_7(self):
-    """Test that new Precision Metric computes correct values at 0.7 threshold."""
+    """Test that Precision Metric computes correct values at 0.7 threshold."""
     np.testing.assert_allclose(
         self.compute_precision(self.model_outputs, threshold=0.7),
         [1 / 2],
     )
 
   def test_precision_with_batch_size_one(self):
-    """Test that new Precision Metric is correct with batch size one."""
+    """Test that Precision Metric is correct with batch size one."""
     np.testing.assert_allclose(
         self.compute_precision(self.model_outputs_batch_size_one),
         [1.0],
     )
 
   def test_recall(self):
-    """Test that new Recall Metric computes correct values."""
+    """Test that Recall Metric computes correct values."""
     np.testing.assert_allclose(
         self.compute_recall(self.model_outputs),
         [1 / 3],
     )
 
   def test_recall_at_0_7(self):
-    """Test that new Recall Metric computes correct values at 0.7 threshold."""
+    """Test that Recall Metric computes correct values at 0.7 threshold."""
     np.testing.assert_allclose(
         self.compute_recall(self.model_outputs, threshold=0.7),
         [1 / 6],
     )
 
   def test_recall_with_batch_size_one(self):
-    """Test that new Recall Metric is correct with batch size one."""
+    """Test that Recall Metric is correct with batch size one."""
     np.testing.assert_allclose(
         self.compute_recall(self.model_outputs_batch_size_one),
         [0.5],
     )
 
   def test_aucpr(self):
-    """Test that new AUC-PR Metric computes correct values."""
+    """Test that AUC-PR Metric computes correct values."""
     np.testing.assert_allclose(
         self.compute_aucpr(self.model_outputs),
         jnp.array(0.5972222, dtype=jnp.float32),
     )
 
   def test_aucpr_with_batch_size_one(self):
-    """Test that new AUC-PR Metric computes correct values with batch size one."""
+    """Test that AUC-PR Metric computes correct values with batch size one."""
     np.testing.assert_allclose(
         self.compute_aucpr(self.model_outputs_batch_size_one),
         jnp.array(0.875, dtype=jnp.float32),
     )
 
   def test_aucroc(self):
-    """Test that new AUC-ROC Metric computes correct values."""
+    """Test that AUC-ROC Metric computes correct values."""
     np.testing.assert_allclose(
         self.compute_aucroc(self.model_outputs),
         jnp.array(0.046875, dtype=jnp.float32),
     )
 
   def test_aucroc_with_batch_size_one(self):
-    """Test that new AUC-ROC Metric computes correct values with batch size one."""
+    """Test that AUC-ROC Metric computes correct values with batch size one."""
     np.testing.assert_allclose(
         self.compute_aucroc(self.model_outputs_batch_size_one),
         [0],
+    )
+
+  def test_mse(self):
+    """Test that MSE Metric computes correct values."""
+    np.testing.assert_allclose(
+        self.compute_mse(self.model_outputs),
+        jnp.array(0.51625, dtype=jnp.float32),
+    )
+
+  def test_mse_with_batch_size_one(self):
+    """Test that MSE Metric computes correct values with batch size one."""
+    np.testing.assert_allclose(
+        self.compute_mse(self.model_outputs_batch_size_one),
+        jnp.array(0.315, dtype=jnp.float32),
+    )
+
+  def test_rmse(self):
+    """Test that RMSE Metric computes correct values."""
+    np.testing.assert_allclose(
+        self.compute_rmse(self.model_outputs),
+        jnp.array(0.71850539, dtype=jnp.float32),
+    )
+
+  def test_rmse_with_batch_size_one(self):
+    """Test that RMSE Metric computes correct values with batch size one."""
+    np.testing.assert_allclose(
+        self.compute_rmse(self.model_outputs_batch_size_one),
+        jnp.array(0.56124860801, dtype=jnp.float32),
     )
 
 

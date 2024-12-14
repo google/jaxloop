@@ -16,10 +16,11 @@
 
 from clu import metrics as clu_metrics
 import flax
+import jax
 import jax.numpy as jnp
 
 
-def _default_threshold() -> jnp.ndarray:
+def _default_threshold() -> jax.Array:
   """This is the default threshold used for binary classification.
 
   Starts at 1.0 and goes down to 0.0 by an interval of 1/199.
@@ -29,9 +30,43 @@ def _default_threshold() -> jnp.ndarray:
   )
 
 
-def _divide_no_nan(x: jnp.ndarray, y: jnp.ndarray) -> jnp.ndarray:
+def _divide_no_nan(x: jax.Array, y: jax.Array) -> jax.Array:
   """Computes a safe divide which returns 0 if the y is zero."""
   return jnp.where(y != 0, jnp.divide(x, y), 0.0)
+
+
+@flax.struct.dataclass
+class MSE(clu_metrics.Average):
+  """Computes the mean squared error for regression problems given `predictions` and `labels`."""
+
+  @classmethod
+  def from_model_output(
+      cls, predictions: jax.Array, labels: jax.Array
+  ) -> 'MSE':
+    """Updates the metric.
+
+    Args:
+      predictions: A floating point `Tensor` whose values are in the range [0,
+        1]. This is calculated from the output logits of the model.
+      labels: True labels. These are expected to be of dtype=int32.
+
+    Returns:
+      Updated MSE metric.
+
+    Raises:
+      ValueError: If type of `labels` is wrong or the shapes of `logits` and
+        `labels` are incompatible.
+    """
+    squared_error = jnp.square(predictions - labels)
+    return super().from_model_output(values=squared_error)
+
+
+@flax.struct.dataclass
+class RMSE(MSE):
+  """Computes the root mean squared error for regression problems given `predictions` and `labels`."""
+
+  def compute(self) -> jax.Array:
+    return jnp.sqrt(super().compute())
 
 
 @flax.struct.dataclass
@@ -45,12 +80,12 @@ class Precision(clu_metrics.Metric):
       label, and threshold.
   """
 
-  true_positives: jnp.ndarray
-  false_positives: jnp.ndarray
+  true_positives: jax.Array
+  false_positives: jax.Array
 
   @classmethod
   def from_model_output(
-      cls, predictions: jnp.ndarray, labels: jnp.ndarray, threshold: float = 0.5
+      cls, predictions: jax.Array, labels: jax.Array, threshold: float = 0.5
   ) -> 'Precision':
     """Updates the metric.
 
@@ -79,7 +114,7 @@ class Precision(clu_metrics.Metric):
         false_positives=self.false_positives + other.false_positives,
     )
 
-  def compute(self) -> jnp.ndarray:
+  def compute(self) -> jax.Array:
     return _divide_no_nan(
         self.true_positives, (self.true_positives + self.false_positives)
     )
@@ -96,12 +131,12 @@ class Recall(clu_metrics.Metric):
       label, and threshold.
   """
 
-  true_positives: jnp.ndarray
-  false_negatives: jnp.ndarray
+  true_positives: jax.Array
+  false_negatives: jax.Array
 
   @classmethod
   def from_model_output(
-      cls, predictions: jnp.ndarray, labels: jnp.ndarray, threshold: float = 0.5
+      cls, predictions: jax.Array, labels: jax.Array, threshold: float = 0.5
   ) -> 'Recall':
     """Updates the metric.
 
@@ -130,7 +165,7 @@ class Recall(clu_metrics.Metric):
         false_negatives=self.false_negatives + other.false_negatives,
     )
 
-  def compute(self) -> jnp.ndarray:
+  def compute(self) -> jax.Array:
     return _divide_no_nan(
         self.true_positives, (self.true_positives + self.false_negatives)
     )
@@ -150,13 +185,13 @@ class AUCPR(clu_metrics.Metric):
   """
 
   # shape: (threshold, 1)
-  true_positives: jnp.ndarray
-  false_positives: jnp.ndarray
-  false_negatives: jnp.ndarray
+  true_positives: jax.Array
+  false_positives: jax.Array
+  false_negatives: jax.Array
 
   @classmethod
   def from_model_output(
-      cls, predictions: jnp.ndarray, labels: jnp.ndarray
+      cls, predictions: jax.Array, labels: jax.Array
   ) -> 'AUCPR':
     """Updates the metric.
 
@@ -194,7 +229,7 @@ class AUCPR(clu_metrics.Metric):
         false_negatives=self.false_negatives + other.false_negatives,
     )
 
-  def compute(self) -> jnp.ndarray:
+  def compute(self) -> jax.Array:
     precision = _divide_no_nan(
         self.true_positives, (self.true_positives + self.false_positives)
     )
@@ -217,14 +252,14 @@ class AUCROC(clu_metrics.Metric):
   """
 
   # shape: (threshold, 1)
-  true_positives: jnp.ndarray
-  false_positives: jnp.ndarray
+  true_positives: jax.Array
+  false_positives: jax.Array
   # shape: (1)
-  total_count: jnp.ndarray
+  total_count: jax.Array
 
   @classmethod
   def from_model_output(
-      cls, predictions: jnp.ndarray, labels: jnp.ndarray
+      cls, predictions: jax.Array, labels: jax.Array
   ) -> 'AUCROC':
     """Updates the metric.
 
@@ -261,7 +296,7 @@ class AUCROC(clu_metrics.Metric):
         total_count=self.total_count + other.total_count,
     )
 
-  def compute(self) -> jnp.ndarray:
+  def compute(self) -> jax.Array:
     tp_rate = _divide_no_nan(self.true_positives, self.total_count)
     fp_rate = _divide_no_nan(self.false_positives, self.total_count)
     return jnp.trapezoid(tp_rate, fp_rate)
