@@ -70,6 +70,61 @@ class RMSE(MSE):
 
 
 @flax.struct.dataclass
+class RSQUARED(clu_metrics.Metric):
+  """Computes the r-squared score of a scalar or a batch of tensors.
+
+  R-squared is a measure of how well the regression model fits the data. It
+  measures the proportion of the variance in the dependent variable that is
+  explained by the independent variable(s). It is defined as 1 - SSE / SST,
+  where SSE is the sum of squared errors and SST is the total sum of squares.
+  """
+
+  total: jax.Array
+  count: jax.Array
+  sum_of_squared_error: jax.Array
+  sum_of_squared_label: jax.Array
+
+  @classmethod
+  def from_model_output(
+      cls, predictions: jax.Array, labels: jax.Array
+  ) -> 'RSQUARED':
+    return cls(
+        total=labels.sum(),
+        count=jnp.ones_like(labels, dtype=jnp.int32).sum(),
+        sum_of_squared_error=jnp.power(labels - predictions, 2).sum(),
+        sum_of_squared_label=jnp.power(labels, 2).sum(),
+    )
+
+  def merge(self, other: 'RSQUARED') -> 'RSQUARED':
+    return type(self)(
+        total=self.total + other.total,
+        sum_of_squared_error=self.sum_of_squared_error
+        + other.sum_of_squared_error,
+        sum_of_squared_label=self.sum_of_squared_label
+        + other.sum_of_squared_label,
+        count=self.count + other.count,
+    )
+
+  def compute(self) -> jax.Array:
+    """Computes the r-squared score.
+
+    Since we don't know the mean of the labels before we aggregate all of the
+    data, we will manipulate the formula to be:
+    sst = \sum_i (x_i - mean)^2
+        = \sum_i (x_i^2 - 2 x_i mean + mean^2)
+        = \sum_i x_i^2 - 2 mean \sum_i x_i + N * mean^2
+        = \sum_i x_i^2 - 2 mean * N * mean + N * mean^2
+        = \sum_i x_i^2 - N * mean^2
+
+    Returns:
+      The r-squared score.
+    """
+    mean = self.total / self.count
+    sst = self.sum_of_squared_label - self.count * jnp.power(mean, 2)
+    return 1 - _divide_no_nan(self.sum_of_squared_error, sst)
+
+
+@flax.struct.dataclass
 class Precision(clu_metrics.Metric):
   """Computes precision for binary classification given `predictions` and `labels`.
 

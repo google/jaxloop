@@ -124,6 +124,16 @@ class MetricsTest(parameterized.TestCase):
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
+  def compute_rsquared(self, model_outputs):
+    metric = None
+    for model_output in model_outputs:
+      update = metrics.RSQUARED.from_model_output(
+          predictions=model_output.get('logits'),
+          labels=model_output.get('labels'),
+      )
+      metric = update if metric is None else metric.merge(update)
+    return metric.compute()
+
   def test_precision(self):
     """Test that Precision Metric computes correct values."""
     np.testing.assert_allclose(
@@ -220,6 +230,23 @@ class MetricsTest(parameterized.TestCase):
     np.testing.assert_allclose(
         self.compute_rmse(self.model_outputs_batch_size_one),
         jnp.array(0.56124860801, dtype=jnp.float32),
+    )
+
+  def test_rsquared(self):
+    """Test that RSQUARED Metric computes correct values.
+
+    Correct values were calculated using the sklearn library.
+    """
+    np.testing.assert_allclose(
+        self.compute_rsquared(self.model_outputs),
+        jnp.array(-1.753333319028219, dtype=jnp.float32),
+    )
+
+  def test_rsquared_with_batch_size_one(self):
+    """Test that RSQUARED Metric computes correct values with batch size one."""
+    np.testing.assert_allclose(
+        self.compute_rsquared(self.model_outputs_batch_size_one),
+        [1.0],
     )
 
 
