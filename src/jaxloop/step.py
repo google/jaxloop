@@ -15,7 +15,7 @@
 """The step library for JAX models."""
 
 import typing
-from typing import Any, List, Mapping, Optional, Protocol, Tuple, Type
+from typing import Any, Dict, Mapping, Optional, Protocol, Tuple, Type, Union
 
 from absl import logging
 from etils import epath
@@ -35,6 +35,7 @@ Batch = types.Batch
 BatchSpec = types.BatchSpec
 Output = types.Output
 State = types.TrainState
+PRNGType = Union[jax.Array, Dict[str, jax.Array]]
 
 _DEFAULT_ITEM_NAME = 'default'
 _STATE_KEYS = ('step', 'params', 'batch_stats')
@@ -83,7 +84,7 @@ class Step(Protocol):
   ```
 
   Parameters:
-    base_prng: The base prng key.
+    base_prng: The base prng key or a list of prng keys.
     model: The model to be trained or evaluated; either as a nn.Module or a
       nnx.Module Type.
     optimizer: The optimizer to be used for training.
@@ -100,7 +101,7 @@ class Step(Protocol):
 
   def __init__(
       self,
-      base_prng: jax.Array,
+      base_prng: PRNGType,
       model: nn.Module | Type[nnx.Module],
       optimizer: optax.GradientTransformation = optax.identity(),
       partitioner: partition.Partitioner = partition.SingleDevicePartitioner(),
@@ -264,9 +265,9 @@ class Step(Protocol):
       step: The number indicating the current step ID.
 
     Returns:
-      The prng key for random number generations.
+      The prng keys for random number generations.
     """
-    return jax.random.fold_in(self._base_prng, step)
+    return jax.tree.map(lambda x: jax.random.fold_in(x, step), self._base_prng)
 
   def compile(self, **kwargs):
     """This method explicitly calls jax.jit to compile the step function.

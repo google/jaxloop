@@ -51,7 +51,7 @@ class TestStep(step.Step):
 
   def __init__(
       self,
-      base_prng: jax.Array,
+      base_prng: step.PRNGType,
       model: nn.Module,
       optimizer: Optional[optax.GradientTransformation] = None,
       partitioner: partition.Partitioner = partition.SingleDevicePartitioner(),
@@ -147,6 +147,18 @@ class StepTest(absltest.TestCase):
       self.step.compile(some_flag_that_does_not_exist=True)
 
   def test_step(self):
+    state = self.step.initialize_model(self.spec)
+    state, _ = self.step(state, self.batch)
+    self.assertEqual(state.step, 1)
+    self.assertEqual(self.step.begin_step, 0)
+    self.assertEqual(self.step.end_step, 1)
+
+  def test_step_with_prng_list(self):
+    self.step = TestStep(
+        {'params': jax.random.PRNGKey(0), 'others': jax.random.PRNGKey(1)},
+        self.model,
+        optimizer=optax.adam(1e-4),
+    )
     state = self.step.initialize_model(self.spec)
     state, _ = self.step(state, self.batch)
     self.assertEqual(state.step, 1)
