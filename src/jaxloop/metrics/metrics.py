@@ -46,16 +46,16 @@ class MSE(clu_metrics.Average):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. This is calculated from the output logits of the model.
-      labels: True labels. These are expected to be of dtype=int32.
+      predictions: A floating point `Tensor` representing the prediction
+        generated from the model. The shape should be [batch_size, 1].
+      labels: True value. The shape should be [batch_size, 1].
 
     Returns:
-      Updated MSE metric.
+      Updated MSE metric. The shape should be a single scalar.
 
     Raises:
-      ValueError: If type of `labels` is wrong or the shapes of `logits` and
-        `labels` are incompatible.
+      ValueError: If type of `labels` is wrong or the shapes of `predictions`
+      and `labels` are incompatible.
     """
     squared_error = jnp.square(predictions - labels)
     return super().from_model_output(values=squared_error)
@@ -88,6 +88,20 @@ class RSQUARED(clu_metrics.Metric):
   def from_model_output(
       cls, predictions: jax.Array, labels: jax.Array
   ) -> 'RSQUARED':
+    """Updates the metric.
+
+    Args:
+      predictions: A floating point `Tensor` representing the prediction
+        generated from the model. The shape should be [batch_size, 1].
+      labels: True value. The shape should be [batch_size, 1].
+
+    Returns:
+      Updated RSQUARED metric. The shape should be a single scalar.
+
+    Raises:
+      ValueError: If type of `labels` is wrong or the shapes of `predictions`
+      and `labels` are incompatible.
+    """
     return cls(
         total=labels.sum(),
         count=jnp.ones_like(labels, dtype=jnp.int32).sum(),
@@ -146,16 +160,17 @@ class Precision(clu_metrics.Metric):
 
     Args:
       predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. This is calculated from the output logits of the model.
-      labels: True labels. These are expected to be of dtype=int32.
+        1]. The shape should be [batch_size, 1].
+      labels: True value. The value is expected to be 0 or 1. The shape should
+        be [batch_size, 1].
       threshold: The threshold to use for the binary classification.
 
     Returns:
-      Updated Precision metric.
+      Updated Precision metric. The shape should be a single scalar.
 
     Raises:
-      ValueError: If type of `labels` is wrong or the shapes of `logits` and
-        `labels` are incompatible.
+      ValueError: If type of `labels` is wrong or the shapes of `predictions`
+      and `labels` are incompatible.
     """
     predictions = jnp.where(predictions >= threshold, 1, 0)
     true_positives = jnp.sum((predictions == 1) & (labels == 1))
@@ -177,7 +192,7 @@ class Precision(clu_metrics.Metric):
 
 @flax.struct.dataclass
 class Recall(clu_metrics.Metric):
-  """Computes recall for binary classification given `logits` and `labels`.
+  """Computes recall for binary classification given `predictions` and `labels`.
 
   Attributes:
     true_positives: The count of true positive instances from the given data,
@@ -197,16 +212,17 @@ class Recall(clu_metrics.Metric):
 
     Args:
       predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. This is calculated from the output logits of the model.
-      labels: True labels. These are expected to be of dtype=int32.
+        1]. The shape should be [batch_size, 1].
+      labels: True value. The value is expected to be 0 or 1. The shape should
+        be [batch_size, 1].
       threshold: The threshold to use for the binary classification.
 
     Returns:
-      Updated Recall metric.
+      Updated Recall metric. The shape should be a single scalar.
 
     Raises:
-      ValueError: If type of `labels` is wrong or the shapes of `logits` and
-        `labels` are incompatible.
+      ValueError: If type of `labels` is wrong or the shapes of `predictions`
+      and `labels` are incompatible.
     """
     predictions = jnp.where(predictions >= threshold, 1, 0)
     true_positives = jnp.sum((predictions == 1) & (labels == 1))
@@ -228,7 +244,7 @@ class Recall(clu_metrics.Metric):
 
 @flax.struct.dataclass
 class AUCPR(clu_metrics.Metric):
-  """Computes area under the precision-recall curve for binary classification given `logits` and `labels`.
+  """Computes area under the precision-recall curve for binary classification given `predictions` and `labels`.
 
   Attributes:
     true_positives: The count of true positive instances from the given data and
@@ -252,15 +268,17 @@ class AUCPR(clu_metrics.Metric):
 
     Args:
       predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. This is calculated from the output logits of the model.
-      labels: True labels. These are expected to be of dtype=int32.
+        1]. The shape should be [batch_size, 1].
+      labels: True value. The value is expected to be 0 or 1. The shape should
+        be [batch_size, 1].
 
     Returns:
-      The area under the precision-recall curve.
+      The area under the precision-recall curve. The shape should be a single
+      scalar.
 
     Raises:
-      ValueError: If type of `labels` is wrong or the shapes of `logits` and
-        `labels` are incompatible.
+      ValueError: If type of `labels` is wrong or the shapes of `predictions`
+      and `labels` are incompatible.
     """
     pred_is_pos = jnp.greater(predictions, _default_threshold()[..., None])
     pred_is_neg = jnp.logical_not(pred_is_pos)
@@ -296,7 +314,7 @@ class AUCPR(clu_metrics.Metric):
 
 @flax.struct.dataclass
 class AUCROC(clu_metrics.Metric):
-  """Computes area under the receiver operation characteristic curve for binary classification given `logits` and `labels`.
+  """Computes area under the receiver operation characteristic curve for binary classification given `predictions` and `labels`.
 
   Attributes:
     true_positives: The count of true positive instances from the given data and
@@ -320,15 +338,17 @@ class AUCROC(clu_metrics.Metric):
 
     Args:
       predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. This is calculated from the output logits of the model.
-      labels: True labels. These are expected to be of dtype=int32.
+        1]. The shape should be [batch_size, 1].
+      labels: True value. The value is expected to be 0 or 1. The shape should
+        be [batch_size, 1].
 
     Returns:
-      The area under the receiver operation characteristic curve.
+      The area under the receiver operation characteristic curve. The shape
+      should be a single scalar.
 
     Raises:
-      ValueError: If type of `labels` is wrong or the shapes of `logits` and
-        `labels` are incompatible.
+      ValueError: If type of `labels` is wrong or the shapes of `predictions`
+      and `labels` are incompatible.
     """
     pred_is_pos = jnp.greater(predictions, _default_threshold()[..., None])
     label_is_pos = jnp.equal(labels, 1)
