@@ -69,6 +69,7 @@ class MetricsTest(parameterized.TestCase):
             labels=jnp.array([1]),
         ),
     )
+    self.sample_weights = jnp.array([0.5, 1, 0, 0, 0, 0, 0, 0, 0, 0])
 
   def compute_precision(self, model_outputs, threshold: float = 0.5):
     metric = None
@@ -112,32 +113,35 @@ class MetricsTest(parameterized.TestCase):
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
-  def compute_mse(self, model_outputs):
+  def compute_mse(self, model_outputs, sample_weights=None):
     metric = None
     for model_output in model_outputs:
       update = metrics.MSE.from_model_output(
           predictions=model_output.get('logits'),
           labels=model_output.get('labels'),
+          sample_weights=sample_weights,
       )
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
-  def compute_rmse(self, model_outputs):
+  def compute_rmse(self, model_outputs, sample_weights=None):
     metric = None
     for model_output in model_outputs:
       update = metrics.RMSE.from_model_output(
           predictions=model_output.get('logits'),
           labels=model_output.get('labels'),
+          sample_weights=sample_weights,
       )
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
-  def compute_rsquared(self, model_outputs):
+  def compute_rsquared(self, model_outputs, sample_weights=None):
     metric = None
     for model_output in model_outputs:
       update = metrics.RSQUARED.from_model_output(
           predictions=model_output.get('logits'),
           labels=model_output.get('labels'),
+          sample_weights=sample_weights,
       )
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
@@ -219,6 +223,13 @@ class MetricsTest(parameterized.TestCase):
         jnp.array(0.47074753, dtype=jnp.float32),
     )
 
+  def test_mse_with_sample_weight(self):
+    """Test that MSE Metric computes correct values when using sample weights."""
+    np.testing.assert_allclose(
+        self.compute_mse(self.model_outputs, self.sample_weights),
+        jnp.array(0.5529917, dtype=jnp.float32),
+    )
+
   def test_mse_with_batch_size_one(self):
     """Test that MSE Metric computes correct values with batch size one."""
     np.testing.assert_allclose(
@@ -231,6 +242,13 @@ class MetricsTest(parameterized.TestCase):
     np.testing.assert_allclose(
         self.compute_rmse(self.model_outputs),
         jnp.array(0.68611044, dtype=jnp.float32),
+    )
+
+  def test_rmse_with_sample_weight(self):
+    """Test that RMSE Metric computes correct values when using sample weights."""
+    np.testing.assert_allclose(
+        self.compute_rmse(self.model_outputs, self.sample_weights),
+        jnp.array(0.7436341, dtype=jnp.float32),
     )
 
   def test_rmse_with_batch_size_one(self):
@@ -248,6 +266,18 @@ class MetricsTest(parameterized.TestCase):
     np.testing.assert_allclose(
         self.compute_rsquared(self.model_outputs).astype(jnp.float16),
         jnp.array(-0.887709, dtype=jnp.float16),
+    )
+
+  def test_rsquared_with_sample_weight(self):
+    """Test that RSQUARED Metric computes correct values when using sample weights.
+
+    Correct values were calculated using the sklearn library.
+    """
+    np.testing.assert_allclose(
+        self.compute_rsquared(self.model_outputs, self.sample_weights).astype(
+            jnp.float16
+        ),
+        jnp.array(-1.2119668, dtype=jnp.float16),
     )
 
   def test_rsquared_with_batch_size_one(self):

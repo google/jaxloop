@@ -41,7 +41,10 @@ class MSE(clu_metrics.Average):
 
   @classmethod
   def from_model_output(
-      cls, predictions: jax.Array, labels: jax.Array
+      cls,
+      predictions: jax.Array,
+      labels: jax.Array,
+      sample_weights: jax.Array | None = None,
   ) -> 'MSE':
     """Updates the metric.
 
@@ -49,6 +52,8 @@ class MSE(clu_metrics.Average):
       predictions: A floating point `Tensor` representing the prediction
         generated from the model. The shape should be [batch_size, 1].
       labels: True value. The shape should be [batch_size, 1].
+      sample_weights: An optional floating point `Tensor` representing the
+        weight of each sample. The shape should be [batch_size, 1].
 
     Returns:
       Updated MSE metric. The shape should be a single scalar.
@@ -58,7 +63,14 @@ class MSE(clu_metrics.Average):
       and `labels` are incompatible.
     """
     squared_error = jnp.square(predictions - labels)
-    return super().from_model_output(values=squared_error)
+    count = jnp.ones_like(labels, dtype=jnp.int32)
+    if sample_weights is not None:
+      squared_error = squared_error * sample_weights
+      count *= sample_weights
+    return cls(
+        total=squared_error.sum(),
+        count=count.sum(),
+    )
 
 
 @flax.struct.dataclass
@@ -86,7 +98,10 @@ class RSQUARED(clu_metrics.Metric):
 
   @classmethod
   def from_model_output(
-      cls, predictions: jax.Array, labels: jax.Array
+      cls,
+      predictions: jax.Array,
+      labels: jax.Array,
+      sample_weights: jax.Array | None = None,
   ) -> 'RSQUARED':
     """Updates the metric.
 
@@ -94,6 +109,8 @@ class RSQUARED(clu_metrics.Metric):
       predictions: A floating point `Tensor` representing the prediction
         generated from the model. The shape should be [batch_size, 1].
       labels: True value. The shape should be [batch_size, 1].
+      sample_weights: An optional floating point `Tensor` representing the
+        weight of each sample. The shape should be [batch_size, 1].
 
     Returns:
       Updated RSQUARED metric. The shape should be a single scalar.
@@ -102,11 +119,19 @@ class RSQUARED(clu_metrics.Metric):
       ValueError: If type of `labels` is wrong or the shapes of `predictions`
       and `labels` are incompatible.
     """
+    count = jnp.ones_like(labels, dtype=jnp.int32)
+    squared_error = jnp.power(labels - predictions, 2)
+    squared_label = jnp.power(labels, 2)
+    if sample_weights is not None:
+      labels = labels * sample_weights
+      count = count * sample_weights
+      squared_error = squared_error * sample_weights
+      squared_label = squared_label * sample_weights
     return cls(
         total=labels.sum(),
-        count=jnp.ones_like(labels, dtype=jnp.int32).sum(),
-        sum_of_squared_error=jnp.power(labels - predictions, 2).sum(),
-        sum_of_squared_label=jnp.power(labels, 2).sum(),
+        count=count.sum(),
+        sum_of_squared_error=squared_error.sum(),
+        sum_of_squared_label=squared_label.sum(),
     )
 
   def merge(self, other: 'RSQUARED') -> 'RSQUARED':
@@ -154,7 +179,10 @@ class Precision(clu_metrics.Metric):
 
   @classmethod
   def from_model_output(
-      cls, predictions: jax.Array, labels: jax.Array, threshold: float = 0.5
+      cls,
+      predictions: jax.Array,
+      labels: jax.Array,
+      threshold: float = 0.5,
   ) -> 'Precision':
     """Updates the metric.
 
