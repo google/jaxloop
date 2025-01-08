@@ -65,7 +65,7 @@ class MSE(clu_metrics.Average):
     squared_error = jnp.square(predictions - labels)
     count = jnp.ones_like(labels, dtype=jnp.int32)
     if sample_weights is not None:
-      squared_error = squared_error * sample_weights
+      squared_error *= sample_weights
       count *= sample_weights
     return cls(
         total=squared_error.sum(),
@@ -123,10 +123,10 @@ class RSQUARED(clu_metrics.Metric):
     squared_error = jnp.power(labels - predictions, 2)
     squared_label = jnp.power(labels, 2)
     if sample_weights is not None:
-      labels = labels * sample_weights
-      count = count * sample_weights
-      squared_error = squared_error * sample_weights
-      squared_label = squared_label * sample_weights
+      labels *= sample_weights
+      count *= sample_weights
+      squared_error *= sample_weights
+      squared_label *= sample_weights
     return cls(
         total=labels.sum(),
         count=count.sum(),
