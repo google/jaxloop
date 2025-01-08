@@ -93,22 +93,24 @@ class MetricsTest(parameterized.TestCase):
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
-  def compute_aucpr(self, model_outputs):
+  def compute_aucpr(self, model_outputs, sample_weights=None):
     metric = None
     for model_output in model_outputs:
       update = metrics.AUCPR.from_model_output(
           predictions=model_output.get('logits'),
           labels=model_output.get('labels'),
+          sample_weights=sample_weights,
       )
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
-  def compute_aucroc(self, model_outputs):
+  def compute_aucroc(self, model_outputs, sample_weights=None):
     metric = None
     for model_output in model_outputs:
       update = metrics.AUCROC.from_model_output(
           predictions=model_output.get('logits'),
           labels=model_output.get('labels'),
+          sample_weights=sample_weights,
       )
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
@@ -195,6 +197,13 @@ class MetricsTest(parameterized.TestCase):
         jnp.array(0.39081815, dtype=jnp.float32),
     )
 
+  def test_aucpr_with_sample_weight(self):
+    """Test that AUC-PR Metric computes correct values when using sample weights."""
+    np.testing.assert_allclose(
+        self.compute_aucpr(self.model_outputs, self.sample_weights),
+        jnp.array(0.3224537, dtype=jnp.float32),
+    )
+
   def test_aucpr_with_batch_size_one(self):
     """Test that AUC-PR Metric computes correct values with batch size one."""
     np.testing.assert_allclose(
@@ -207,6 +216,13 @@ class MetricsTest(parameterized.TestCase):
     np.testing.assert_allclose(
         self.compute_aucroc(self.model_outputs),
         jnp.array(0.059375, dtype=jnp.float32),
+    )
+
+  def test_aucroc_with_sample_weight(self):
+    """Test that AUC-ROC Metric computes correct values when using sample weights."""
+    np.testing.assert_allclose(
+        self.compute_aucroc(self.model_outputs, self.sample_weights),
+        jnp.array(0.02777778, dtype=jnp.float32),
     )
 
   def test_aucroc_with_batch_size_one(self):

@@ -290,7 +290,10 @@ class AUCPR(clu_metrics.Metric):
 
   @classmethod
   def from_model_output(
-      cls, predictions: jax.Array, labels: jax.Array
+      cls,
+      predictions: jax.Array,
+      labels: jax.Array,
+      sample_weights: jax.Array | None = None,
   ) -> 'AUCPR':
     """Updates the metric.
 
@@ -299,6 +302,8 @@ class AUCPR(clu_metrics.Metric):
         1]. The shape should be [batch_size, 1].
       labels: True value. The value is expected to be 0 or 1. The shape should
         be [batch_size, 1].
+      sample_weights: An optional floating point `Tensor` representing the
+        weight of each sample. The shape should be [batch_size, 1].
 
     Returns:
       The area under the precision-recall curve. The shape should be a single
@@ -316,6 +321,11 @@ class AUCPR(clu_metrics.Metric):
     true_positives = pred_is_pos * label_is_pos
     false_positives = pred_is_pos * label_is_neg
     false_negatives = pred_is_neg * label_is_pos
+
+    if sample_weights is not None:
+      true_positives *= sample_weights
+      false_positives *= sample_weights
+      false_negatives *= sample_weights
 
     return cls(
         true_positives=true_positives.sum(axis=-1),
@@ -360,7 +370,10 @@ class AUCROC(clu_metrics.Metric):
 
   @classmethod
   def from_model_output(
-      cls, predictions: jax.Array, labels: jax.Array
+      cls,
+      predictions: jax.Array,
+      labels: jax.Array,
+      sample_weights: jax.Array | None = None,
   ) -> 'AUCROC':
     """Updates the metric.
 
@@ -369,6 +382,8 @@ class AUCROC(clu_metrics.Metric):
         1]. The shape should be [batch_size, 1].
       labels: True value. The value is expected to be 0 or 1. The shape should
         be [batch_size, 1].
+      sample_weights: An optional floating point `Tensor` representing the
+        weight of each sample. The shape should be [batch_size, 1].
 
     Returns:
       The area under the receiver operation characteristic curve. The shape
@@ -384,12 +399,17 @@ class AUCROC(clu_metrics.Metric):
 
     true_positives = pred_is_pos * label_is_pos
     false_positives = pred_is_pos * label_is_neg
-    total_count = jnp.size(labels)
+    total = jnp.ones_like(labels)
+
+    if sample_weights is not None:
+      true_positives *= sample_weights
+      false_positives *= sample_weights
+      total *= sample_weights
 
     return cls(
         true_positives=true_positives.sum(axis=-1),
         false_positives=false_positives.sum(axis=-1),
-        total_count=total_count,
+        total_count=total.sum(axis=-1),
     )
 
   def merge(self, other: 'AUCROC') -> 'AUCROC':
