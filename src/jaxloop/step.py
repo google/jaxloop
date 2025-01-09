@@ -429,25 +429,18 @@ class Step(Protocol):
       restore_kwargs: Mapping[str, Any],
   ) -> State:
     """Restores the model state using an asynchronous checkpointer."""
-    pytree_checkpoint_handler = ocp.PyTreeCheckpointHandler()
     checkpointer = ocp.AsyncCheckpointer(
-        ocp.CompositeCheckpointHandler(
-            **{_DEFAULT_ITEM_NAME: pytree_checkpoint_handler},
-        ),
+        ocp.CompositeCheckpointHandler(),
         checkpoint_metadata_store=ocp.metadata.metadata_store(
             enable_write=False  # Disable writing metadata during restore.
         ),
     )
-    _, restore_ckpt_arg_cls = checkpoint_args.get_registered_args_cls(
-        pytree_checkpoint_handler
-    )
-
     return checkpointer.restore(
         ocp.path.step.build_step_path(
             checkpoint_dir, ocp.path.step.standard_name_format(), step
         ),
         args=ocp.args.Composite(**{
-            _DEFAULT_ITEM_NAME: restore_ckpt_arg_cls(
+            _DEFAULT_ITEM_NAME: ocp.args.PyTreeRestore(
                 abstract_state, **restore_kwargs
             )  # pytype: disable=wrong-arg-count
         }),
