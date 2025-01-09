@@ -19,12 +19,21 @@ from absl.testing import parameterized
 import jax.numpy as jnp
 from jaxloop.metrics import metrics
 import numpy as np
+from sklearn import metrics as sklearn_metrics
+
+np.random.seed(42)
+OUTPUT_LABELS = np.random.randint(0, 2, size=(4, 10))
+OUTPUT_PREDS = np.random.uniform(size=(4, 10))
+OUTPUT_LABELS_BS1 = np.random.randint(0, 2, size=(4, 1))
+OUTPUT_PREDS_BS1 = np.random.uniform(size=(4, 1))
 
 
 class MetricsTest(parameterized.TestCase):
 
   def setUp(self):
     super().setUp()
+
+    # TODO(jeffcarp): Merge these into generated fixtures.
     self.model_outputs = (
         dict(
             logits=jnp.array(
@@ -70,28 +79,6 @@ class MetricsTest(parameterized.TestCase):
         ),
     )
     self.sample_weights = jnp.array([0.5, 1, 0, 0, 0, 0, 0, 0, 0, 0])
-
-  def compute_precision(self, model_outputs, threshold: float = 0.5):
-    metric = None
-    for model_output in model_outputs:
-      update = metrics.Precision.from_model_output(
-          predictions=model_output.get('logits'),
-          labels=model_output.get('labels'),
-          threshold=threshold,
-      )
-      metric = update if metric is None else metric.merge(update)
-    return metric.compute()
-
-  def compute_recall(self, model_outputs, threshold: float = 0.5):
-    metric = None
-    for model_output in model_outputs:
-      update = metrics.Recall.from_model_output(
-          predictions=model_output.get('logits'),
-          labels=model_output.get('labels'),
-          threshold=threshold,
-      )
-      metric = update if metric is None else metric.merge(update)
-    return metric.compute()
 
   def compute_aucpr(self, model_outputs, sample_weights=None):
     metric = None
@@ -148,46 +135,56 @@ class MetricsTest(parameterized.TestCase):
       metric = update if metric is None else metric.merge(update)
     return metric.compute()
 
-  def test_precision(self):
-    """Test that Precision Metric computes correct values."""
+  @parameterized.named_parameters(
+      ('basic', OUTPUT_LABELS, OUTPUT_PREDS, 0.5),
+      ('high_threshold', OUTPUT_LABELS, OUTPUT_PREDS, 0.7),
+      ('low_threshold', OUTPUT_LABELS, OUTPUT_PREDS, 0.1),
+      ('batch_size_one', OUTPUT_LABELS_BS1, OUTPUT_PREDS_BS1, 0.5),
+  )
+  def test_precision(self, y_true, y_pred, threshold):
+    """Test that Precision metric computes correct values."""
+    y_true = y_true.reshape((-1,))
+    y_pred = jnp.where(y_pred.reshape((-1,)) >= threshold, 1, 0)
+    expected = sklearn_metrics.precision_score(y_true, y_pred)
+
+    metric = None
+    for logits, labels in zip(y_pred, y_true):
+      update = metrics.Precision.from_model_output(
+          predictions=logits,
+          labels=labels,
+          threshold=threshold,
+      )
+      metric = update if metric is None else metric.merge(update)
+
     np.testing.assert_allclose(
-        self.compute_precision(self.model_outputs),
-        jnp.array(0.35, dtype=jnp.float32),
+        metric.compute(),
+        expected,
     )
 
-  def test_precision_at_0_7(self):
-    """Test that Precision Metric computes correct values at 0.7 threshold."""
-    np.testing.assert_allclose(
-        self.compute_precision(self.model_outputs, threshold=0.7),
-        jnp.array(0.08333334, dtype=jnp.float32),
-    )
+  @parameterized.named_parameters(
+      ('basic', OUTPUT_LABELS, OUTPUT_PREDS, 0.5),
+      ('high_threshold', OUTPUT_LABELS, OUTPUT_PREDS, 0.7),
+      ('low_threshold', OUTPUT_LABELS, OUTPUT_PREDS, 0.1),
+      ('batch_size_one', OUTPUT_LABELS_BS1, OUTPUT_PREDS_BS1, 0.5),
+  )
+  def test_recall(self, y_true, y_pred, threshold):
+    """Test that Recall metric computes correct values."""
+    y_true = y_true.reshape((-1,))
+    y_pred = jnp.where(y_pred.reshape((-1,)) >= threshold, 1, 0)
+    expected = sklearn_metrics.recall_score(y_true, y_pred)
 
-  def test_precision_with_batch_size_one(self):
-    """Test that Precision Metric is correct with batch size one."""
-    np.testing.assert_allclose(
-        self.compute_precision(self.model_outputs_batch_size_one),
-        [1.0],
-    )
+    metric = None
+    for logits, labels in zip(y_pred, y_true):
+      update = metrics.Recall.from_model_output(
+          predictions=logits,
+          labels=labels,
+          threshold=threshold,
+      )
+      metric = update if metric is None else metric.merge(update)
 
-  def test_recall(self):
-    """Test that Recall Metric computes correct values."""
     np.testing.assert_allclose(
-        self.compute_recall(self.model_outputs),
-        [1 / 3],
-    )
-
-  def test_recall_at_0_7(self):
-    """Test that Recall Metric computes correct values at 0.7 threshold."""
-    np.testing.assert_allclose(
-        self.compute_recall(self.model_outputs, threshold=0.7),
-        jnp.array(0.04761905, dtype=jnp.float32),
-    )
-
-  def test_recall_with_batch_size_one(self):
-    """Test that Recall Metric is correct with batch size one."""
-    np.testing.assert_allclose(
-        self.compute_recall(self.model_outputs_batch_size_one),
-        [0.5],
+        metric.compute(),
+        expected,
     )
 
   def test_aucpr(self):
