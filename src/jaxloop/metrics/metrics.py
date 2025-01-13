@@ -49,11 +49,11 @@ class MSE(clu_metrics.Average):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` representing the prediction
-        generated from the model. The shape should be [batch_size, 1].
-      labels: True value. The shape should be [batch_size, 1].
-      sample_weights: An optional floating point `Tensor` representing the
-        weight of each sample. The shape should be [batch_size, 1].
+      predictions: A floating point 1D vector representing the prediction
+        generated from the model. The shape should be (batch_size,).
+      labels: True value. The shape should be (batch_size,).
+      sample_weights: An optional floating point 1D vector representing the
+        weight of each sample. The shape should be (batch_size,).
 
     Returns:
       Updated MSE metric. The shape should be a single scalar.
@@ -106,11 +106,11 @@ class RSQUARED(clu_metrics.Metric):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` representing the prediction
-        generated from the model. The shape should be [batch_size, 1].
-      labels: True value. The shape should be [batch_size, 1].
-      sample_weights: An optional floating point `Tensor` representing the
-        weight of each sample. The shape should be [batch_size, 1].
+      predictions: A floating point 1D vector representing the prediction
+        generated from the model. The shape should be (batch_size,).
+      labels: True value. The shape should be (batch_size,).
+      sample_weights: An optional floating point 1D vector representing the
+        weight of each sample. The shape should be (batch_size,).
 
     Returns:
       Updated RSQUARED metric. The shape should be a single scalar.
@@ -187,10 +187,10 @@ class Precision(clu_metrics.Metric):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. The shape should be [batch_size, 1].
+      predictions: A floating point 1D vector whose values are in the range [0,
+        1]. The shape should be (batch_size,).
       labels: True value. The value is expected to be 0 or 1. The shape should
-        be [batch_size, 1].
+        be (batch_size,).
       threshold: The threshold to use for the binary classification.
 
     Returns:
@@ -239,10 +239,10 @@ class Recall(clu_metrics.Metric):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. The shape should be [batch_size, 1].
+      predictions: A floating point 1D vector whose values are in the range [0,
+        1]. The shape should be (batch_size,).
       labels: True value. The value is expected to be 0 or 1. The shape should
-        be [batch_size, 1].
+        be (batch_size,).
       threshold: The threshold to use for the binary classification.
 
     Returns:
@@ -298,12 +298,12 @@ class AUCPR(clu_metrics.Metric):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. The shape should be [batch_size, 1].
+      predictions: A floating point 1D vector whose values are in the range [0,
+        1]. The shape should be (batch_size,).
       labels: True value. The value is expected to be 0 or 1. The shape should
-        be [batch_size, 1].
-      sample_weights: An optional floating point `Tensor` representing the
-        weight of each sample. The shape should be [batch_size, 1].
+        be (batch_size,).
+      sample_weights: An optional floating point 1D vector representing the
+        weight of each sample. The shape should be (batch_size,).
 
     Returns:
       The area under the precision-recall curve. The shape should be a single
@@ -378,12 +378,12 @@ class AUCROC(clu_metrics.Metric):
     """Updates the metric.
 
     Args:
-      predictions: A floating point `Tensor` whose values are in the range [0,
-        1]. The shape should be [batch_size, 1].
+      predictions: A floating point 1D vector whose values are in the range [0,
+        1]. The shape should be (batch_size,).
       labels: True value. The value is expected to be 0 or 1. The shape should
-        be [batch_size, 1].
-      sample_weights: An optional floating point `Tensor` representing the
-        weight of each sample. The shape should be [batch_size, 1].
+        be (batch_size,).
+      sample_weights: An optional floating point 1D vector representing the
+        weight of each sample. The shape should be (batch_size,).
 
     Returns:
       The area under the receiver operation characteristic curve. The shape
@@ -409,7 +409,7 @@ class AUCROC(clu_metrics.Metric):
     return cls(
         true_positives=true_positives.sum(axis=-1),
         false_positives=false_positives.sum(axis=-1),
-        total_count=total.sum(axis=-1),
+        total_count=total.sum(),
     )
 
   def merge(self, other: 'AUCROC') -> 'AUCROC':
