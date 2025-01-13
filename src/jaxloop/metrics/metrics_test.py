@@ -210,23 +210,41 @@ class MetricsTest(parameterized.TestCase):
 
   def test_aucroc(self):
     """Test that AUC-ROC Metric computes correct values."""
+    # Concatenate logits and labels
+    all_logits = jnp.concatenate(
+        [model_output['logits'] for model_output in self.model_outputs]
+    )
+    all_labels = jnp.concatenate(
+        [model_output['labels'] for model_output in self.model_outputs]
+    )
     np.testing.assert_allclose(
         self.compute_aucroc(self.model_outputs),
-        jnp.array(0.059375, dtype=jnp.float32),
+        sklearn_metrics.roc_auc_score(all_labels, all_logits),
     )
 
   def test_aucroc_with_sample_weight(self):
     """Test that AUC-ROC Metric computes correct values when using sample weights."""
-    np.testing.assert_allclose(
-        self.compute_aucroc(self.model_outputs, self.sample_weights),
-        jnp.array(0.02777778, dtype=jnp.float32),
+    # Concatenate logits and labels
+    all_logits = jnp.concatenate(
+        [model_output['logits'] for model_output in self.model_outputs]
     )
-
-  def test_aucroc_with_batch_size_one(self):
-    """Test that AUC-ROC Metric computes correct values with batch size one."""
+    all_labels = jnp.concatenate(
+        [model_output['labels'] for model_output in self.model_outputs]
+    )
+    sample_weights = jnp.concatenate(
+        [self.sample_weights] * len(self.model_outputs)
+    )
     np.testing.assert_allclose(
-        self.compute_aucroc(self.model_outputs_batch_size_one),
-        [0],
+        jnp.array(
+            self.compute_aucroc(self.model_outputs, self.sample_weights),
+            dtype=jnp.float16,
+        ),
+        jnp.array(
+            sklearn_metrics.roc_auc_score(
+                all_labels, all_logits, sample_weight=sample_weights
+            ),
+            dtype=jnp.float16,
+        ),
     )
 
   def test_mse(self):

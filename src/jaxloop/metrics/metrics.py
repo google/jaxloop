@@ -364,9 +364,9 @@ class AUCROC(clu_metrics.Metric):
 
   # shape: (threshold, 1)
   true_positives: jax.Array
+  true_negatives: jax.Array
   false_positives: jax.Array
-  # shape: (1)
-  total_count: jax.Array
+  false_negatives: jax.Array
 
   @classmethod
   def from_model_output(
@@ -394,32 +394,41 @@ class AUCROC(clu_metrics.Metric):
       and `labels` are incompatible.
     """
     pred_is_pos = jnp.greater(predictions, _default_threshold()[..., None])
+    pred_is_neg = jnp.logical_not(pred_is_pos)
     label_is_pos = jnp.equal(labels, 1)
     label_is_neg = jnp.equal(labels, 0)
 
     true_positives = pred_is_pos * label_is_pos
+    true_negatives = pred_is_neg * label_is_neg
     false_positives = pred_is_pos * label_is_neg
-    total = jnp.ones_like(labels)
+    false_negatives = pred_is_neg * label_is_pos
 
     if sample_weights is not None:
       true_positives *= sample_weights
+      true_negatives *= sample_weights
       false_positives *= sample_weights
-      total *= sample_weights
+      false_negatives *= sample_weights
 
     return cls(
         true_positives=true_positives.sum(axis=-1),
+        true_negatives=true_negatives.sum(axis=-1),
         false_positives=false_positives.sum(axis=-1),
-        total_count=total.sum(),
+        false_negatives=false_negatives.sum(axis=-1),
     )
 
   def merge(self, other: 'AUCROC') -> 'AUCROC':
     return type(self)(
         true_positives=self.true_positives + other.true_positives,
+        true_negatives=self.true_negatives + other.true_negatives,
         false_positives=self.false_positives + other.false_positives,
-        total_count=self.total_count + other.total_count,
+        false_negatives=self.false_negatives + other.false_negatives,
     )
 
   def compute(self) -> jax.Array:
-    tp_rate = _divide_no_nan(self.true_positives, self.total_count)
-    fp_rate = _divide_no_nan(self.false_positives, self.total_count)
+    tp_rate = _divide_no_nan(
+        self.true_positives, self.true_positives + self.false_negatives
+    )
+    fp_rate = _divide_no_nan(
+        self.false_positives, self.false_positives + self.true_negatives
+    )
     return jnp.trapezoid(tp_rate, fp_rate)
