@@ -114,6 +114,14 @@ class LoopTest(absltest.TestCase):
         ),
     )
 
+  def test_loop_dataset(self):
+    state = self.step.initialize_model(self.shape)
+    output_state, outputs = self.loop(
+        state, self.dataset, return_state_from_step=False
+    )
+    self.assertEqual(output_state, state)
+    self.assertEqual(outputs['step'], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+
 
 if __name__ == '__main__':
   absltest.main()

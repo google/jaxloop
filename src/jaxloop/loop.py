@@ -94,11 +94,21 @@ class Loop:
     """
     step = 0
     loop_outputs = collections.defaultdict(list)
+    # return_state_from_step: If true, return state object will be returned from
+    #   step with each batch. Sometimes this needs to be disabled for supporting
+    #   returning empty state from step to free up memory during eval loop as
+    #   eval loop doesn't update model weights and optimizer state.
+    return_state_from_step = kwargs.pop('return_state_from_step', True)
     for batch in dataset:
       log_num_flops = log_num_flops and step == 0
-      state, step_outputs = self._step(
-          state, batch, log_num_flops=log_num_flops, **kwargs
-      )
+      if return_state_from_step:
+        state, step_outputs = self._step(
+            state, batch, log_num_flops=log_num_flops, **kwargs
+        )
+      else:
+        _, step_outputs = self._step(
+            state, batch, log_num_flops=log_num_flops, **kwargs
+        )
       loop_outputs = self.update_outputs(loop_outputs, step_outputs)
       step += 1
       if num_steps is not None and step >= num_steps:
