@@ -23,6 +23,8 @@ import jax.numpy as jnp
 def _default_threshold() -> jax.Array:
   """This is the default threshold used for binary classification.
 
+  Enables cheap AUC calculation via Reimann sum.
+
   Starts at 1.0 and goes down to 0.0 by an interval of 1/199.
   """
   return jnp.array(
@@ -65,8 +67,8 @@ class MSE(clu_metrics.Average):
     squared_error = jnp.square(predictions - labels)
     count = jnp.ones_like(labels, dtype=jnp.int32)
     if sample_weights is not None:
-      squared_error *= sample_weights
-      count *= sample_weights
+      squared_error = squared_error * sample_weights
+      count = count * sample_weights
     return cls(
         total=squared_error.sum(),
         count=count.sum(),
@@ -123,10 +125,10 @@ class RSQUARED(clu_metrics.Metric):
     squared_error = jnp.power(labels - predictions, 2)
     squared_label = jnp.power(labels, 2)
     if sample_weights is not None:
-      labels *= sample_weights
-      count *= sample_weights
-      squared_error *= sample_weights
-      squared_label *= sample_weights
+      labels = labels * sample_weights
+      count = count * sample_weights
+      squared_error = squared_error * sample_weights
+      squared_label = squared_label * sample_weights
     return cls(
         total=labels.sum(),
         count=count.sum(),
@@ -137,11 +139,11 @@ class RSQUARED(clu_metrics.Metric):
   def merge(self, other: 'RSQUARED') -> 'RSQUARED':
     return type(self)(
         total=self.total + other.total,
+        count=self.count + other.count,
         sum_of_squared_error=self.sum_of_squared_error
         + other.sum_of_squared_error,
         sum_of_squared_label=self.sum_of_squared_label
         + other.sum_of_squared_label,
-        count=self.count + other.count,
     )
 
   def compute(self) -> jax.Array:
@@ -323,9 +325,9 @@ class AUCPR(clu_metrics.Metric):
     false_negatives = pred_is_neg * label_is_pos
 
     if sample_weights is not None:
-      true_positives *= sample_weights
-      false_positives *= sample_weights
-      false_negatives *= sample_weights
+      true_positives = true_positives * sample_weights
+      false_positives = false_positives * sample_weights
+      false_negatives = false_negatives * sample_weights
 
     return cls(
         true_positives=true_positives.sum(axis=-1),
@@ -404,10 +406,10 @@ class AUCROC(clu_metrics.Metric):
     false_negatives = pred_is_neg * label_is_pos
 
     if sample_weights is not None:
-      true_positives *= sample_weights
-      true_negatives *= sample_weights
-      false_positives *= sample_weights
-      false_negatives *= sample_weights
+      true_positives = true_positives * sample_weights
+      true_negatives = true_negatives * sample_weights
+      false_positives = false_positives * sample_weights
+      false_negatives = false_negatives * sample_weights
 
     return cls(
         true_positives=true_positives.sum(axis=-1),
