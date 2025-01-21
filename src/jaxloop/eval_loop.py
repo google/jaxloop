@@ -84,9 +84,14 @@ class EvalLoop(pipeline_loop.PipelineLoop):
       A tuple of the model state and output.
     """
     step = int(state.step)
-    logging.info(
-        f'eval     | step: {step: 6d} | running {num_steps} eval steps.'
-    )
+    if num_steps is None:
+      logging.info(
+          f'eval     | step: {step: 6d} | running until the end of eval data.'
+      )
+    else:
+      logging.info(
+          f'eval     | step: {step: 6d} | running {num_steps} eval steps.'
+      )
     if mode == EvalMode.LOOP:
       return super(pipeline_loop.PipelineLoop, self).run(
           state, dataset, num_steps, **kwargs
