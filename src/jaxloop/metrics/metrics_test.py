@@ -172,21 +172,21 @@ class MetricsTest(parameterized.TestCase):
     """Test that AUC-PR Metric computes correct values."""
     np.testing.assert_allclose(
         self.compute_aucpr(self.model_outputs),
-        jnp.array(0.39081815, dtype=jnp.float32),
+        jnp.array(0.41513795, dtype=jnp.float32),
     )
 
   def test_aucpr_with_sample_weight(self):
     """Test that AUC-PR Metric computes correct values when using sample weights."""
     np.testing.assert_allclose(
         self.compute_aucpr(self.model_outputs, self.sample_weights),
-        jnp.array(0.3224537, dtype=jnp.float32),
+        jnp.array(0.32785615, dtype=jnp.float32),
     )
 
   def test_aucpr_with_batch_size_one(self):
     """Test that AUC-PR Metric computes correct values with batch size one."""
     np.testing.assert_allclose(
         self.compute_aucpr(self.model_outputs_batch_size_one),
-        jnp.array(0.875, dtype=jnp.float32),
+        jnp.array(1.0, dtype=jnp.float32),
     )
 
   def test_aucroc(self):

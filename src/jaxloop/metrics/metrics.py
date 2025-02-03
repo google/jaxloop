@@ -20,16 +20,26 @@ import jax
 import jax.numpy as jnp
 
 
-def _default_threshold() -> jax.Array:
-  """This is the default threshold used for binary classification.
+def _default_threshold(num_thresholds: int) -> jax.Array:
+  """Returns evenly distributed `num_thresholds` between 0.0 and 1.0.
 
-  Enables cheap AUC calculation via Reimann sum.
+  Args:
+    num_thresholds: The number of thresholds to return.
 
-  Starts at 1.0 and goes down to 0.0 by an interval of 1/199.
+  Returns:
+    Evently distributed `num_thresholds` between 0.0 and 1.0.
   """
-  return jnp.array(
-      [1.0 + 1e-7] + [(198 - i) / (199) for i in range(198)] + [0.0 - 1e-7]
+  if num_thresholds < 2:
+    raise ValueError(
+        f'num_thresholds must be at least 2, but got {num_thresholds}.'
+    )
+  epsilon = 1e-5
+  thresholds = jnp.arange(num_thresholds, dtype=jnp.float32) / (
+      num_thresholds - 1
   )
+  thresholds = thresholds.at[0].set(-epsilon)
+  thresholds = thresholds.at[-1].set(1.0 + epsilon)
+  return thresholds
 
 
 def _divide_no_nan(x: jax.Array, y: jax.Array) -> jax.Array:
@@ -276,6 +286,17 @@ class Recall(clu_metrics.Metric):
 class AUCPR(clu_metrics.Metric):
   """Computes area under the precision-recall curve for binary classification given `predictions` and `labels`.
 
+  AUC-PR Curve metric have a number of known issues so use it with caution.
+  - PR curves are highly class balance sensitive.
+  - PR is a non-monotonic function and thus its "area" is not directly
+    proportional to performance.
+  - PR-AUC has no standard implementation and different libraries will give
+    different results. Some libraries will interpolate between points, others
+    will assume a step function (or trapezoidal as sklearn does). Some libraries
+    will compute the convex hull of the PR curve, others will not. Because PR is
+    non monotonic, its value is sensitive to the number of samples along the
+    curve (more so than ROC-AUC).
+
   Attributes:
     true_positives: The count of true positive instances from the given data and
       label at each threshold.
@@ -289,6 +310,7 @@ class AUCPR(clu_metrics.Metric):
   true_positives: jax.Array
   false_positives: jax.Array
   false_negatives: jax.Array
+  num_thresholds: int
 
   @classmethod
   def from_model_output(
@@ -296,6 +318,7 @@ class AUCPR(clu_metrics.Metric):
       predictions: jax.Array,
       labels: jax.Array,
       sample_weights: jax.Array | None = None,
+      num_thresholds: int = 200,
   ) -> 'AUCPR':
     """Updates the metric.
 
@@ -306,6 +329,7 @@ class AUCPR(clu_metrics.Metric):
         be (batch_size,).
       sample_weights: An optional floating point 1D vector representing the
         weight of each sample. The shape should be (batch_size,).
+      num_thresholds: The number of thresholds to use. Default is 200.
 
     Returns:
       The area under the precision-recall curve. The shape should be a single
@@ -315,7 +339,10 @@ class AUCPR(clu_metrics.Metric):
       ValueError: If type of `labels` is wrong or the shapes of `predictions`
       and `labels` are incompatible.
     """
-    pred_is_pos = jnp.greater(predictions, _default_threshold()[..., None])
+    pred_is_pos = jnp.greater(
+        predictions,
+        _default_threshold(num_thresholds=num_thresholds)[..., None],
+    )
     pred_is_neg = jnp.logical_not(pred_is_pos)
     label_is_pos = jnp.equal(labels, 1)
     label_is_neg = jnp.equal(labels, 0)
@@ -333,6 +360,7 @@ class AUCPR(clu_metrics.Metric):
         true_positives=true_positives.sum(axis=-1),
         false_positives=false_positives.sum(axis=-1),
         false_negatives=false_negatives.sum(axis=-1),
+        num_thresholds=num_thresholds,
     )
 
   def merge(self, other: 'AUCPR') -> 'AUCPR':
@@ -340,16 +368,82 @@ class AUCPR(clu_metrics.Metric):
         true_positives=self.true_positives + other.true_positives,
         false_positives=self.false_positives + other.false_positives,
         false_negatives=self.false_negatives + other.false_negatives,
+        num_thresholds=self.num_thresholds,
     )
 
+  def interpolate_pr_auc(self) -> jax.Array:
+    """Interpolation formula inspired by section 4 of Davis & Goadrich 2006.
+
+    https://minds.wisconsin.edu/handle/1793/60482
+
+    Note here we derive & use a closed formula not present in the paper
+    as follows:
+
+      Precision = TP / (TP + FP) = TP / P
+
+    Modeling all of TP (true positive), FP (false positive) and their sum
+    P = TP + FP (predicted positive) as varying linearly within each
+    interval [A, B] between successive thresholds, we get
+
+      Precision slope = dTP / dP
+                      = (TP_B - TP_A) / (P_B - P_A)
+                      = (TP - TP_A) / (P - P_A)
+      Precision = (TP_A + slope * (P - P_A)) / P
+
+    The area within the interval is (slope / total_pos_weight) times
+
+      int_A^B{Precision.dP} = int_A^B{(TP_A + slope * (P - P_A)) * dP / P}
+      int_A^B{Precision.dP} = int_A^B{slope * dP + intercept * dP / P}
+
+    where intercept = TP_A - slope * P_A = TP_B - slope * P_B, resulting in
+
+      int_A^B{Precision.dP} = TP_B - TP_A + intercept * log(P_B / P_A)
+
+    Bringing back the factor (slope / total_pos_weight) we'd put aside, we
+    get
+
+      slope * [dTP + intercept *  log(P_B / P_A)] / total_pos_weight
+
+    where dTP == TP_B - TP_A.
+
+    Note that when P_A == 0 the above calculation simplifies into
+
+      int_A^B{Precision.dTP} = int_A^B{slope * dTP} = slope * (TP_B - TP_A)
+
+    which is really equivalent to imputing constant precision throughout the
+    first bucket having >0 true positives.
+
+    Returns:
+      pr_auc: A float scalar jax.Array that is an approximation of the area
+      under the P-R curve.
+    """
+    dtp = (
+        self.true_positives[: self.num_thresholds - 1] - self.true_positives[1:]
+    )
+    p = self.true_positives + self.false_positives
+    dp = p[: self.num_thresholds - 1] - p[1:]
+    prec_slope = _divide_no_nan(dtp, jnp.maximum(dp, 0))
+    intercept = self.true_positives[1:] - prec_slope * p[1:]
+
+    # recall_relative_ratio
+    safe_p_ratio = jnp.where(
+        jnp.multiply(p[: self.num_thresholds - 1] > 0, p[1:] > 0),
+        _divide_no_nan(
+            p[: self.num_thresholds - 1],
+            jnp.maximum(p[1:], 0),
+        ),
+        jnp.ones_like(p[1:]),
+    )
+    # pr_auc_increment
+    pr_auc_increment = _divide_no_nan(
+        prec_slope * (dtp + intercept * jnp.log(safe_p_ratio)),
+        jnp.maximum(self.true_positives[1:] + self.false_negatives[1:], 0),
+    )
+    return jnp.sum(pr_auc_increment)
+
   def compute(self) -> jax.Array:
-    precision = _divide_no_nan(
-        self.true_positives, (self.true_positives + self.false_positives)
-    )
-    recall = _divide_no_nan(
-        self.true_positives, (self.true_positives + self.false_negatives)
-    )
-    return jnp.trapezoid(precision, recall)
+    # Use interpolation to compute the area under the PR curve to match Keras.
+    return self.interpolate_pr_auc()
 
 
 @flax.struct.dataclass
@@ -369,6 +463,7 @@ class AUCROC(clu_metrics.Metric):
   true_negatives: jax.Array
   false_positives: jax.Array
   false_negatives: jax.Array
+  num_thresholds: int
 
   @classmethod
   def from_model_output(
@@ -376,6 +471,7 @@ class AUCROC(clu_metrics.Metric):
       predictions: jax.Array,
       labels: jax.Array,
       sample_weights: jax.Array | None = None,
+      num_thresholds: int = 200,
   ) -> 'AUCROC':
     """Updates the metric.
 
@@ -386,6 +482,7 @@ class AUCROC(clu_metrics.Metric):
         be (batch_size,).
       sample_weights: An optional floating point 1D vector representing the
         weight of each sample. The shape should be (batch_size,).
+      num_thresholds: The number of thresholds to use. Default is 200.
 
     Returns:
       The area under the receiver operation characteristic curve. The shape
@@ -395,7 +492,10 @@ class AUCROC(clu_metrics.Metric):
       ValueError: If type of `labels` is wrong or the shapes of `predictions`
       and `labels` are incompatible.
     """
-    pred_is_pos = jnp.greater(predictions, _default_threshold()[..., None])
+    pred_is_pos = jnp.greater(
+        predictions,
+        _default_threshold(num_thresholds=num_thresholds)[..., None],
+    )
     pred_is_neg = jnp.logical_not(pred_is_pos)
     label_is_pos = jnp.equal(labels, 1)
     label_is_neg = jnp.equal(labels, 0)
@@ -416,6 +516,7 @@ class AUCROC(clu_metrics.Metric):
         true_negatives=true_negatives.sum(axis=-1),
         false_positives=false_positives.sum(axis=-1),
         false_negatives=false_negatives.sum(axis=-1),
+        num_thresholds=num_thresholds,
     )
 
   def merge(self, other: 'AUCROC') -> 'AUCROC':
@@ -424,6 +525,7 @@ class AUCROC(clu_metrics.Metric):
         true_negatives=self.true_negatives + other.true_negatives,
         false_positives=self.false_positives + other.false_positives,
         false_negatives=self.false_negatives + other.false_negatives,
+        num_thresholds=self.num_thresholds,
     )
 
   def compute(self) -> jax.Array:
@@ -433,4 +535,5 @@ class AUCROC(clu_metrics.Metric):
     fp_rate = _divide_no_nan(
         self.false_positives, self.false_positives + self.true_negatives
     )
-    return jnp.trapezoid(tp_rate, fp_rate)
+    # Threshold goes from 0 to 1, so trapezoid is negative.
+    return jnp.trapezoid(tp_rate, fp_rate) * -1
