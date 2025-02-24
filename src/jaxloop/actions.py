@@ -103,10 +103,14 @@ class CheckpointAction(Action):
   def __init__(self, ckpt_manager: ocp.CheckpointManager, interval: int = 1):
     super().__init__(interval=interval)
     self._ckpt_manager = ckpt_manager
+    self._data_transfer_fn = jax.device_get
 
   @property
   def ckpt_manager(self) -> ocp.CheckpointManager:
     return self._ckpt_manager
+
+  def set_data_transfer_fn(self, data_transfer_fn: Callable[[Any], Any]):
+    self._data_transfer_fn = data_transfer_fn
 
   def __call__(
       self, state: State, outputs: Optional[Output], **kwargs
@@ -117,8 +121,8 @@ class CheckpointAction(Action):
     # Otherwise, async checkpointing will fail when jax.jit output is donated.
     succeeded = self._ckpt_manager.save(
         step,
-        metrics=jax.device_get(outputs),
-        items=jax.device_get(state),
+        metrics=self._data_transfer_fn(outputs),
+        items=self._data_transfer_fn(state),
     )
     if succeeded:
       logging.info(
