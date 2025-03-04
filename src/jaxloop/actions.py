@@ -37,8 +37,8 @@ ApplyFn = Callable[[PyTree, PyTree], PyTree]
 class Action(Protocol):
   """Base class for actions.
 
-  Action is an operation to be performed periodically in the training or
-  evaluation loop.
+  Action is an operation to be performed periodically in the training loop,
+  evaluation loop, or step.
   """
 
   def __init__(self, interval: int = 1):
@@ -46,7 +46,8 @@ class Action(Protocol):
 
     Args:
       interval: The interval of the action. It should be a positive integer. The
-        action will be invoked every `interval` inner loops. Default is 1.
+        action will be invoked every `interval` inner loops or steps, depending
+        on if the value is passed to a `Loop` or `Step`. Default is 1.
     """
     super().__init__()
     if interval <= 0:

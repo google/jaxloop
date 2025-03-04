@@ -53,7 +53,8 @@ class Loop:
     return state, dataset
 
   def update_outputs(
-      self, loop_outputs: Output, step_outputs: Optional[Output]) -> Output:
+      self, loop_outputs: Output, step_outputs: Optional[Output]
+  ) -> Output:
     """Updates the outputs of the loop.
 
     This method should be overridden if custom `update_outputs` logic is needed.
@@ -92,7 +93,7 @@ class Loop:
     Returns:
       A tuple of the model state and output.
     """
-    step = 0
+    per_loop_step_number = 0
     loop_outputs = collections.defaultdict(list)
     # return_state_from_step: If true, return state object will be returned from
     #   step with each batch. Sometimes this needs to be disabled for supporting
@@ -100,18 +101,26 @@ class Loop:
     #   eval loop doesn't update model weights and optimizer state.
     return_state_from_step = kwargs.pop('return_state_from_step', True)
     for batch in dataset:
-      log_num_flops = log_num_flops and step == 0
+      log_num_flops = log_num_flops and per_loop_step_number == 0
+      per_loop_step_number += 1
       if return_state_from_step:
         state, step_outputs = self._step(
-            state, batch, log_num_flops=log_num_flops, **kwargs
+            state,
+            batch,
+            per_loop_step_number,
+            log_num_flops=log_num_flops,
+            **kwargs
         )
       else:
         _, step_outputs = self._step(
-            state, batch, log_num_flops=log_num_flops, **kwargs
+            state,
+            batch,
+            per_loop_step_number,
+            log_num_flops=log_num_flops,
+            **kwargs
         )
       loop_outputs = self.update_outputs(loop_outputs, step_outputs)
-      step += 1
-      if num_steps is not None and step >= num_steps:
+      if num_steps is not None and per_loop_step_number >= num_steps:
         break
     return state, loop_outputs
 

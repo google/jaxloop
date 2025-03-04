@@ -23,6 +23,7 @@ from flax import linen as nn
 from flax import nnx
 import jax
 import jax.numpy as jnp
+from jaxloop import actions
 from jaxloop import partition
 from jaxloop import types
 import optax
@@ -97,6 +98,11 @@ class Step(Protocol):
       only used when model is an nnx.Module Type and ignored otherwise.
     nnx_model_kwargs: Model _init__ keyword arguments for nnx.Module. Note: this
       field is only used when model is an nnx.Module Type and ignored otherwise.
+    begin_actions: The actions to be run at the beginning of the step.
+    end_actions: The actions to be run at the end of the step. Note, including
+    such actions, when triggered on a particular step, will require all JAX
+    computations to be finished before the action can be invoked. This can cause
+    a slight performance penalty for such steps.
   """
 
   def __init__(
@@ -108,6 +114,8 @@ class Step(Protocol):
       train: bool = False,
       should_shard_batch: bool = True,
       nnx_model_args: Optional[Tuple[Any, ...]] = None,
+      begin_actions: Optional[list[actions.Action]] = None,
+      end_actions: Optional[list[actions.Action]] = None,
       **nnx_model_kwargs: Any,
   ):
     self._nnx_precheck(model, nnx_model_args)
@@ -129,6 +137,8 @@ class Step(Protocol):
     self._cached_run = None
     self._num_params = None
     self._num_flops = None
+    self._begin_actions = begin_actions
+    self._end_actions = end_actions
 
   def _nnx_precheck(
       self,
@@ -294,6 +304,12 @@ class Step(Protocol):
     """
     return state, batch
 
+  def _run_begin_actions(self, state: State, step: int):
+    if self._begin_actions is not None:
+      for action in self._begin_actions:
+        if step % action.interval == 0:
+          action(state, None)
+
   def run(
       self, state: State, batch: Batch, **kwargs
   ) -> Tuple[State, Optional[Output]]:
@@ -329,12 +345,26 @@ class Step(Protocol):
     """
     return state, outputs
 
+  def _run_end_actions(
+      self, state: State, outputs: Optional[Output], step: int
+  ):
+    if self._end_actions is not None:
+      for action in self._end_actions:
+        if step % action.interval == 0:
+          jax.block_until_ready(outputs)
+          action(state, outputs)
+
   def shard_batch(self, batch: Batch) -> Batch:
     """Shards the input data batch based on the partitioner."""
     return self._partitioner.shard_batch(batch)
 
   def __call__(
-      self, state: State, batch: Batch, log_num_flops: bool = False, **kwargs
+      self,
+      state: State,
+      batch: Batch,
+      per_loop_step_number: int = 0,
+      log_num_flops: bool = False,
+      **kwargs,
   ) -> Tuple[State, Optional[Output]]:
     """Invokes the step.
 
@@ -347,6 +377,8 @@ class Step(Protocol):
     Args:
       state: The model state.
       batch: The input data batch.
+      per_loop_step_number: The number indicating the current step within the
+        loop.
       log_num_flops: Whether to log the number of flops of the jitted `run`
         function.
       **kwargs: Additional keyword arguments for running the step.
@@ -359,6 +391,7 @@ class Step(Protocol):
 
     if self._should_shard_batch:
       batch = self.shard_batch(batch)
+    self._run_begin_actions(state, per_loop_step_number)
     state, batch = self.begin(state, batch)
 
     if log_num_flops and self.num_flops is None:
@@ -366,7 +399,10 @@ class Step(Protocol):
       logging.info(f'Step flops: {self.num_flops}')
 
     state, outputs = self._cached_run(state, batch, **kwargs)
-    return self.end(state, outputs)
+    state, outputs = self.end(state, outputs)
+    self._run_end_actions(state, outputs, per_loop_step_number)
+
+    return state, outputs
 
   def compute_num_params(self, state: State) -> int:
     """Computes the number of parameters in the model state.

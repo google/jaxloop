@@ -65,8 +65,8 @@ class ActionLoopTest(absltest.TestCase):
   def setUp(self):
     super().setUp()
     self.model = TestModel()
-    self.step = TestStep(
-        jax.random.PRNGKey(0), self.model, optax.adam(1e-4))
+
+    # Actions
     self.begin_actions = [
         TestAction(interval=1),
         TestAction(interval=2),
@@ -77,6 +77,25 @@ class ActionLoopTest(absltest.TestCase):
         TestAction(interval=2),
         TestAction(interval=3),
     ]
+    self.begin_step_actions = [
+        TestAction(interval=1),
+        TestAction(interval=2),
+        TestAction(interval=15),
+    ]
+    self.end_step_actions = [
+        TestAction(interval=1),
+        TestAction(interval=2),
+        TestAction(interval=15),
+    ]
+
+    # Step and Loop
+    self.step = TestStep(
+        jax.random.PRNGKey(0),
+        self.model,
+        optax.adam(1e-4),
+        begin_actions=self.begin_step_actions,
+        end_actions=self.end_step_actions,
+    )
     self.loop = action_loop.ActionLoop(
         self.step,
         begin_actions=self.begin_actions,
@@ -87,6 +106,7 @@ class ActionLoopTest(absltest.TestCase):
     shape = [1, 28, 28, 1]
     state = self.step.initialize_model(shape)
 
+    # 10 batches
     dataset = iter([jnp.ones(shape)] * 10)
     state, _ = self.loop(state, dataset)
     self.assertEqual(self.loop.loop_count, 1)
@@ -96,8 +116,15 @@ class ActionLoopTest(absltest.TestCase):
     self.assertEqual(self.end_actions[0].call_count, 1)
     self.assertEqual(self.end_actions[1].call_count, 0)
     self.assertEqual(self.end_actions[2].call_count, 0)
+    self.assertEqual(self.begin_step_actions[0].call_count, 10)
+    self.assertEqual(self.begin_step_actions[1].call_count, 5)
+    self.assertEqual(self.begin_step_actions[2].call_count, 0)
+    self.assertEqual(self.end_step_actions[0].call_count, 10)
+    self.assertEqual(self.end_step_actions[1].call_count, 5)
+    self.assertEqual(self.end_step_actions[2].call_count, 0)
 
-    dataset = iter([jnp.ones(shape)] * 10)
+    # 15 batches
+    dataset = iter([jnp.ones(shape)] * 15)
     self.loop(state, dataset)
     self.assertEqual(self.begin_actions[0].call_count, 2)
     self.assertEqual(self.begin_actions[1].call_count, 1)
@@ -105,7 +132,14 @@ class ActionLoopTest(absltest.TestCase):
     self.assertEqual(self.end_actions[0].call_count, 2)
     self.assertEqual(self.end_actions[1].call_count, 1)
     self.assertEqual(self.end_actions[2].call_count, 0)
+    self.assertEqual(self.begin_step_actions[0].call_count, 25)
+    self.assertEqual(self.begin_step_actions[1].call_count, 12)
+    self.assertEqual(self.begin_step_actions[2].call_count, 1)
+    self.assertEqual(self.end_step_actions[0].call_count, 25)
+    self.assertEqual(self.end_step_actions[1].call_count, 12)
+    self.assertEqual(self.end_step_actions[2].call_count, 1)
 
+    # 10 batches, with a loop count reset
     dataset = iter([jnp.ones(shape)] * 10)
     self.loop.loop_count = 1
     self.loop(state, dataset)
@@ -115,7 +149,12 @@ class ActionLoopTest(absltest.TestCase):
     self.assertEqual(self.end_actions[0].call_count, 3)
     self.assertEqual(self.end_actions[1].call_count, 2)
     self.assertEqual(self.end_actions[2].call_count, 0)
-
+    self.assertEqual(self.begin_step_actions[0].call_count, 35)
+    self.assertEqual(self.begin_step_actions[1].call_count, 17)
+    self.assertEqual(self.begin_step_actions[2].call_count, 1)
+    self.assertEqual(self.end_step_actions[0].call_count, 35)
+    self.assertEqual(self.end_step_actions[1].call_count, 17)
+    self.assertEqual(self.end_step_actions[2].call_count, 1)
 
 if __name__ == '__main__':
   absltest.main()
