@@ -34,6 +34,7 @@ STAT_BEGIN_TIME = f'{STAT_PREFIX}/begin_time'
 STAT_LIFE_TIME_SECS = f'{STAT_PREFIX}/life_time_secs'
 STAT_LOOP_TIME_SECS = f'{STAT_PREFIX}/loop_time_secs'
 STAT_STEPS_PER_SEC = f'{STAT_PREFIX}/steps_per_sec'
+STAT_EXAMPLES_PER_SEC = f'{STAT_PREFIX}/examples_per_sec'
 
 
 class StatLoop(Loop):
@@ -47,10 +48,12 @@ class StatLoop(Loop):
       self,
       step: Step,
       stat_names: Optional[Sequence[str]] = None,
+      global_batch_size: Optional[int] = None,
   ):
     super().__init__(step)
     self._stat_names = stat_names or []
     self._init_time = time.time()
+    self._global_batch_size = global_batch_size
     self._begin_time = None
     self._begin_step = None
 
@@ -134,5 +137,13 @@ class StatLoop(Loop):
       if STAT_STEPS_PER_SEC in self._stat_names:
         outputs[STAT_STEPS_PER_SEC] = (
             (int(state.step) - self._begin_step) / runtime_secs
+        )
+      if (
+          STAT_EXAMPLES_PER_SEC in self._stat_names
+          and STAT_STEPS_PER_SEC in outputs
+          and self._global_batch_size
+      ):
+        outputs[STAT_EXAMPLES_PER_SEC] = (
+            self._global_batch_size * outputs[STAT_STEPS_PER_SEC]
         )
     return super().end(state, outputs)
