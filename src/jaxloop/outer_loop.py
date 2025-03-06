@@ -149,6 +149,41 @@ class OuterLoop:
             'Number of eval loops must match number of eval specs.'
         )
 
+  def _restore_model(
+      self,
+      step: Step,
+      state: State,
+      checkpoint_dir: Optional[epath.Path] = None,
+      step_num: Optional[int] = None,
+  ) -> State:
+    """Restores the model state from the checkpoint.
+
+    Args:
+      step: The step object to restore.
+      state: The model state.
+      checkpoint_dir: The checkpoint directory. It not provided, the checkpoint
+        directory from the checkpoint spec will be used.
+      step_num: The step number to restore. If not provided, the step object
+        will automatically determine the latest step.
+
+    Returns:
+      The model state containing the restored checkpoint.
+    """
+    if self._checkpoint_spec is None:
+      raise ValueError('`checkpoint_spec` must be provided.')
+
+    if checkpoint_dir is None:
+      checkpoint_dir = self._checkpoint_spec.checkpoint_dir
+      if checkpoint_dir is None:
+        raise ValueError('`checkpoint_dir` must be provided.')
+
+    return step.restore_model(
+        state,
+        checkpoint_dir,
+        step=step_num,
+        transforms=self._checkpoint_spec.transforms,
+    )
+
   def _run_eval_loops(
       self,
       state: State,
@@ -178,18 +213,13 @@ class OuterLoop:
       timeout_fn = default_timeout_fn
 
     outputs = None
-    for step in checkpoint.checkpoint_utils.checkpoints_iterator(
+    for step_num in checkpoint.checkpoint_utils.checkpoints_iterator(
         checkpoint_dir,
         timeout=self._checkpoint_spec.iterate_interval_secs,
         timeout_fn=timeout_fn,
     ):
       for eval_loop, spec in zip(self._eval_loops, eval_specs):
-        state = eval_loop.step.restore_model(
-            state,
-            checkpoint_dir,
-            step=step,
-            transforms=self._checkpoint_spec.transforms,
-        )
+        state = self._restore_model(eval_loop.step, state, step_num=step_num)
         state, outputs = eval_loop(
             state, iter(spec.dataset), spec.num_steps, mode=spec.mode
         )
@@ -243,11 +273,7 @@ class OuterLoop:
       )
 
     if self._checkpoint_spec is not None:
-      state = self._train_loop.step.restore_model(
-          state,
-          self._checkpoint_spec.checkpoint_dir,
-          transforms=self._checkpoint_spec.transforms,
-      )
+      state = self._restore_model(self._train_loop.step, state)
 
     step = int(state.step)
     if log_train_total_steps:
@@ -266,9 +292,7 @@ class OuterLoop:
     stop_loop = False
     while step < train_total_steps and not stop_loop:
       num_steps = min(num_steps, train_total_steps - step)
-      state, new_outputs = self._train_loop(
-          state, train_dataset, num_steps
-      )
+      state, new_outputs = self._train_loop(state, train_dataset, num_steps)
       num_steps = train_loop_steps
       if step == int(state.step):
         logging.warning(
