@@ -91,9 +91,7 @@ class SummaryAction(Action):
   def summary_writer(self) -> metric_writers.MetricWriter:
     return self._summary_writer
 
-  def __call__(
-      self, state: State, outputs: Optional[Output], **kwargs
-  ) -> None:
+  def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:
     step = int(state.step)
     self._summary_writer.write_scalars(step, outputs)
 
@@ -113,17 +111,22 @@ class CheckpointAction(Action):
   def set_data_transfer_fn(self, data_transfer_fn: Callable[[Any], Any]):
     self._data_transfer_fn = data_transfer_fn
 
-  def __call__(
-      self, state: State, outputs: Optional[Output], **kwargs
-  ) -> None:
-    step = int(state.step)
+  def save(self, step: int, state: State, outputs: Optional[Output]) -> bool:
     # Move `train_state` and `metrics` to host before doing async checkpointing.
     # This saves HBM usage during checkpointing.
     # Otherwise, async checkpointing will fail when jax.jit output is donated.
-    succeeded = self._ckpt_manager.save(
+    return self._ckpt_manager.save(
         step,
         metrics=self._data_transfer_fn(outputs),
         items=self._data_transfer_fn(state),
+    )
+
+  def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:
+    step = int(state.step)
+    succeeded = self.save(
+        step,
+        state,
+        outputs,
     )
     if succeeded:
       logging.info(

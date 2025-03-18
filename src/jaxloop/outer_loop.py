@@ -149,12 +149,13 @@ class OuterLoop:
             'Number of eval loops must match number of eval specs.'
         )
 
-  def _restore_model(
+  def _restore_state(
       self,
       step: Step,
       state: State,
       checkpoint_dir: Optional[epath.Path] = None,
       step_num: Optional[int] = None,
+      dataset_iter: Optional[Iterator[Any]] = None,
   ) -> State:
     """Restores the model state from the checkpoint.
 
@@ -165,10 +166,12 @@ class OuterLoop:
         directory from the checkpoint spec will be used.
       step_num: The step number to restore. If not provided, the step object
         will automatically determine the latest step.
+      dataset_iter: The dataset iterator.
 
     Returns:
       The model state containing the restored checkpoint.
     """
+    del dataset_iter  # Unused.
     if self._checkpoint_spec is None:
       raise ValueError('`checkpoint_spec` must be provided.')
 
@@ -219,7 +222,7 @@ class OuterLoop:
         timeout_fn=timeout_fn,
     ):
       for eval_loop, spec in zip(self._eval_loops, eval_specs):
-        state = self._restore_model(eval_loop.step, state, step_num=step_num)
+        state = self._restore_state(eval_loop.step, state, step_num=step_num)
         state, outputs = eval_loop(
             state, iter(spec.dataset), spec.num_steps, mode=spec.mode
         )
@@ -273,7 +276,9 @@ class OuterLoop:
       )
 
     if self._checkpoint_spec is not None:
-      state = self._restore_model(self._train_loop.step, state)
+      state = self._restore_state(
+          self._train_loop.step, state, dataset_iter=train_dataset
+      )
 
     step = int(state.step)
     if log_train_total_steps:

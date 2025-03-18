@@ -81,3 +81,4 @@ IterateStopFn = Callable[[], bool]
 
 class TrainState(train_state.TrainState):
   batch_stats: Optional[Any] = None
+  dataset_state: Optional[dict[str, Any]] = None
