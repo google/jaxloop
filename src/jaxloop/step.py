@@ -198,6 +198,8 @@ class Step(Protocol):
       )
 
     batch = jax.tree_util.tree_map(map_fn, spec, is_leaf=is_leaf)
+    if self._should_shard_batch:
+      batch = self.shard_batch(batch)
     state = self._partitioner.shard_init_fn(init_fn)(batch)
     if log_num_params:
       if self._num_params is None:
