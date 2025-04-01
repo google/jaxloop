@@ -2,6 +2,7 @@
 
 from typing import Tuple
 
+import clu.metrics as clu_metrics
 import jax
 from jax import numpy as jnp
 from jaxloop import step
@@ -77,7 +78,7 @@ class SimpleStep(step.Step):
     )
 
     output = {
-        "loss": loss,
+        "loss": clu_metrics.Average.from_model_output(loss),
         "output_features_pred": output_features_pred,
     }
 

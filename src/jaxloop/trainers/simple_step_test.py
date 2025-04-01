@@ -22,7 +22,7 @@ import flax.linen as nn
 import jax
 import jax.numpy as jnp
 from jaxloop import types
-from jaxloop.presets import simple_step
+from jaxloop.trainers import simple_step
 import optax
 from orbax import checkpoint
 
@@ -32,7 +32,7 @@ State = types.TrainState
 
 
 class TestModel(nn.Module):
-  """A fully-connected neural network model with 3 layers"""
+  """A fully-connected neural network model with 3 layers."""
 
   @nn.compact
   def __call__(self, x, **kwargs):
@@ -133,11 +133,11 @@ class StepTest(absltest.TestCase):
 
     for i in range(3):
       state, output = self.step(state, self.batch)
-      self.assertEqual(state.step, 2+i)
+      self.assertEqual(state.step, 2 + i)
       self.assertIn('loss', output)
       self.assertIn('output_features_pred', output)
 
-    self.assertLess(output['loss'], loss_1)
+    self.assertLess(output['loss'].total.item(), loss_1.total.item())
 
 
 if __name__ == '__main__':
