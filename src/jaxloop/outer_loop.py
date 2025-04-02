@@ -187,6 +187,32 @@ class OuterLoop:
         transforms=self._checkpoint_spec.transforms,
     )
 
+  def _get_eval_checkpoint_iterator(self) -> Iterator[int]:
+    """Returns an iterator for the eval checkpoint steps.
+
+    Returns:
+      An iterator of checkpoint steps.
+    """
+    if self._checkpoint_spec is None:
+      raise ValueError('`checkpoint_spec` must be provided.')
+
+    checkpoint_dir = self._checkpoint_spec.checkpoint_dir
+
+    def default_timeout_fn():
+      stopped_file = checkpoint_dir / _STOP_FILE_NAME
+      return stopped_file.exists()
+
+    if self._checkpoint_spec.iterate_stop_fn is not None:
+      timeout_fn = self._checkpoint_spec.iterate_stop_fn
+    else:
+      timeout_fn = default_timeout_fn
+
+    return checkpoint.checkpoint_utils.checkpoints_iterator(
+        checkpoint_dir,
+        timeout=self._checkpoint_spec.iterate_interval_secs,
+        timeout_fn=timeout_fn,
+    )
+
   def _run_eval_loops(
       self,
       state: State,
@@ -201,26 +227,11 @@ class OuterLoop:
     Returns:
       A tuple of the model state and output.
     """
-    if self._eval_loops is None or self._checkpoint_spec is None:
-      raise ValueError('`eval_loops` and `checkpoint_spec` must be provided.')
-
-    checkpoint_dir = self._checkpoint_spec.checkpoint_dir
-
-    def default_timeout_fn():
-      stopped_file = checkpoint_dir / _STOP_FILE_NAME
-      return stopped_file.exists()
-
-    if self._checkpoint_spec.iterate_stop_fn is not None:
-      timeout_fn = self._checkpoint_spec.iterate_stop_fn
-    else:
-      timeout_fn = default_timeout_fn
+    if self._eval_loops is None:
+      raise ValueError('`eval_loops` must be provided.')
 
     outputs = None
-    for step_num in checkpoint.checkpoint_utils.checkpoints_iterator(
-        checkpoint_dir,
-        timeout=self._checkpoint_spec.iterate_interval_secs,
-        timeout_fn=timeout_fn,
-    ):
+    for step_num in self._get_eval_checkpoint_iterator():
       for eval_loop, spec in zip(self._eval_loops, eval_specs):
         state = self._restore_state(eval_loop.step, state, step_num=step_num)
         state, outputs = eval_loop(
