@@ -432,8 +432,7 @@ class Step(Protocol):
     """
     if self._cached_run is None:
       self.compile()
-    with jax.spmd_mode('allow_all'):
-      analysis = self._cached_run.lower(state, batch).cost_analysis()
+    analysis = self._cached_run.lower(state, batch).cost_analysis()
     self._num_flops = analysis.get('flops', 0)
     return self.num_flops
 
