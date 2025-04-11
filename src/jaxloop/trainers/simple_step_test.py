@@ -15,7 +15,6 @@
 """Unit tests for the step library."""
 
 import os
-from typing import Optional, Tuple
 
 from absl.testing import absltest
 import flax.linen as nn
@@ -34,11 +33,15 @@ State = types.TrainState
 class TestModel(nn.Module):
   """A fully-connected neural network model with 3 layers."""
 
+  with_dropout: bool = False
+
   @nn.compact
-  def __call__(self, x, **kwargs):
+  def __call__(self, x, train: bool = True, **kwargs):
     for _ in range(3):
       x = nn.Dense(features=16)(x)
       x = nn.relu(x)
+      if self.with_dropout:
+        x = nn.Dropout(rate=0.5, deterministic=not train)(x)
     x = nn.Dense(features=1)(x)
     return x
 
@@ -133,6 +136,30 @@ class StepTest(absltest.TestCase):
 
     for i in range(3):
       state, output = self.step(state, self.batch)
+      self.assertEqual(state.step, 2 + i)
+      self.assertIn('loss', output)
+      self.assertIn('output_features_pred', output)
+
+    self.assertLess(output['loss'].total.item(), loss_1.total.item())
+
+  def test_step_with_dropout(self):
+    model = TestModel(with_dropout=True)
+    step = simple_step.SimpleStep(
+        {'params': jax.random.PRNGKey(0), 'dropout': jax.random.PRNGKey(1)},
+        model,
+        optimizer=optax.adam(1e-4),
+        train=True,
+    )
+    state = step.initialize_model(self.spec)
+    state, output = step(state, self.batch)
+    self.assertEqual(state.step, 1)
+    self.assertIn('loss', output)
+    self.assertIn('output_features_pred', output)
+
+    loss_1 = output['loss']
+
+    for i in range(3):
+      state, output = step(state, self.batch)
       self.assertEqual(state.step, 2 + i)
       self.assertIn('loss', output)
       self.assertIn('output_features_pred', output)

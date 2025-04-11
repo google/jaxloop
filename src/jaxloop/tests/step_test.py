@@ -51,7 +51,7 @@ class TestStep(step.Step):
 
   def __init__(
       self,
-      base_prng: step.PRNGType,
+      base_prng: types.PRNGType,
       model: nn.Module,
       optimizer: Optional[optax.GradientTransformation] = None,
       partitioner: partition.Partitioner = partition.SingleDevicePartitioner(),

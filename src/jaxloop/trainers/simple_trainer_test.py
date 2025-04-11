@@ -17,11 +17,15 @@ from jaxloop.trainers import trainer_utils
 class TestModel(nn.Module):
   """A fully-connected neural network model with 3 layers."""
 
+  with_dropout: bool = False
+
   @nn.compact
-  def __call__(self, x, **kwargs):
+  def __call__(self, x, train: bool = True, **kwargs):
     for _ in range(3):
       x = nn.Dense(features=4)(x)
       x = nn.relu(x)
+      if self.with_dropout:
+        x = nn.Dropout(rate=0.5, deterministic=not train)(x)
     x = nn.Dense(features=1)(x)
     return x
 
@@ -44,7 +48,7 @@ class SimpleTrainerTest(absltest.TestCase):
     self.epochs = 2
     self.steps_per_epoch = 3
 
-    self.model = TestModel()
+    self.model = TestModel(with_dropout=False)
     self.spec = {'input_features': [2, 3], 'output_features': [2, 1]}
     self.batches = [
         {
@@ -60,6 +64,28 @@ class SimpleTrainerTest(absltest.TestCase):
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
         batch_spec=self.spec,
+    )
+
+    outputs = trainer.train(self.batches)
+    self.assertEqual(
+        trainer.model_state.step, self.epochs * self.steps_per_epoch
+    )
+    self.assertIsNotNone(outputs)
+    self.assertIsNotNone(outputs['loss'])
+    self.assertLen(outputs['loss'], self.steps_per_epoch)
+
+  def test_basic_training_with_prng(self):
+    model = TestModel(with_dropout=True)
+
+    trainer = simple_trainer.SimpleTrainer(
+        model,
+        epochs=self.epochs,
+        steps_per_epoch=self.steps_per_epoch,
+        batch_spec=self.spec,
+        base_prng={
+            'params': jax.random.PRNGKey(0),
+            'dropout': jax.random.PRNGKey(1),
+        },
     )
 
     outputs = trainer.train(self.batches)

@@ -59,6 +59,7 @@ class SimpleTrainer:
           action_loop_lib.ActionLoop
       ] = action_loop_lib.ActionLoop,
       outer_loop_class: Type[outer_loop.OuterLoop] = outer_loop.OuterLoop,
+      base_prng: types.PRNGType | None = None,
       **kwargs,
   ):
     self._model = model
@@ -68,9 +69,12 @@ class SimpleTrainer:
     self._log_num_params = log_num_params
     self._checkpointing_config = checkpointing_config
 
-    self._train_step = simple_step.SimpleStep(
+    if base_prng is None:
+      base_prng = {"params": jax.random.PRNGKey(0)}
+
+    self._train_step = step_class(
         model=model,
-        base_prng=jax.random.PRNGKey(0),
+        base_prng=base_prng,
         train=True,
         optimizer=optimizer,
         partitioner=partioner,
@@ -85,7 +89,10 @@ class SimpleTrainer:
     )
 
     self._eval_step = step_class(
-        model=model, base_prng=jax.random.PRNGKey(0), train=False, **kwargs
+        base_prng=base_prng,
+        model=model,
+        train=False,
+        **kwargs,
     )
     self._eval_loop = eval_loop_class(
         step=self._eval_step,

@@ -15,7 +15,7 @@
 """The step library for JAX models."""
 
 import typing
-from typing import Any, Dict, Mapping, Optional, Protocol, Tuple, Type, Union
+from typing import Any, Mapping, Optional, Protocol, Tuple, Type
 
 from absl import logging
 from etils import epath
@@ -28,7 +28,6 @@ from jaxloop import partition
 from jaxloop import types
 import optax
 import orbax.checkpoint as ocp
-from orbax.checkpoint import checkpoint_args
 from orbax.checkpoint import checkpoint_utils
 
 DType = types.DType
@@ -36,7 +35,6 @@ Batch = types.Batch
 BatchSpec = types.BatchSpec
 Output = types.Output
 State = types.TrainState
-PRNGType = Union[jax.Array, Dict[str, jax.Array]]
 
 _DEFAULT_ITEM_NAME = 'default'
 _STATE_KEYS = ('step', 'params', 'batch_stats')
@@ -107,7 +105,7 @@ class Step(Protocol):
 
   def __init__(
       self,
-      base_prng: PRNGType,
+      base_prng: types.PRNGType,
       model: nn.Module | Type[nnx.Module],
       optimizer: optax.GradientTransformation = optax.identity(),
       partitioner: partition.Partitioner = partition.SingleDevicePartitioner(),

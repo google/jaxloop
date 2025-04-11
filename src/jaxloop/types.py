@@ -43,6 +43,7 @@ class MetricType(enum.Enum):
 
 Array = Union[np.ndarray, jnp.ndarray]
 Scalar = Union[int, float, np.number, np.ndarray, jax.Array]
+PRNGType = Union[jax.Array, Dict[str, jax.Array]]
 
 
 @dataclasses.dataclass(frozen=True)

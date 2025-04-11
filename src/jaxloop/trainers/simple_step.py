@@ -149,7 +149,8 @@ class SimpleStep(step.Step):
       output_features_pred = state.apply_fn(
           {"params": params},
           input_features,
-          **{"train": self._train},
+          train=self._train,
+          rngs=self._base_prng
       )
 
       loss = self.loss_fn(output_features_pred, output_features)
