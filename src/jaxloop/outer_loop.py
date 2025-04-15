@@ -337,7 +337,7 @@ class OuterLoop:
     if self._train_loop and self._train_loop.end_actions:
       for action in self._train_loop.end_actions:
         if isinstance(action, actions.CheckpointAction):
-          action._ckpt_manager.close()  # pytype: disable=protected-access
+          action._ckpt_manager.close()  # pylint: disable=protected-access
 
     if self._checkpoint_spec is not None and jax.process_index() == 0:
       stopped_file = self._checkpoint_spec.checkpoint_dir / _STOP_FILE_NAME
