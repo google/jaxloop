@@ -82,9 +82,13 @@ class SummaryAction(Action):
   """Summary action."""
 
   def __init__(
-      self, summary_writer: metric_writers.MetricWriter, interval: int = 1
+      self,
+      summary_writer: metric_writers.MetricWriter,
+      interval: int = 1,
+      flush_each_call: bool = False,
   ):
     super().__init__(interval=interval)
+    self._flush_each_call = flush_each_call
     self._summary_writer = summary_writer
 
   @property
@@ -94,6 +98,8 @@ class SummaryAction(Action):
   def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:
     step = int(state.step)
     self._summary_writer.write_scalars(step, outputs)
+    if self._flush_each_call:
+      self._summary_writer.flush()
 
 
 class CheckpointAction(Action):
