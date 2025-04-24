@@ -225,19 +225,23 @@ class OuterLoop:
       eval_specs: The evaluation datasets, number of steps and intervals.
 
     Returns:
-      A tuple of the model state and output.
+      A tuple of the model state and output. The last eval_state and output
+      from the last eval loop are returned.
     """
     if self._eval_loops is None:
       raise ValueError('`eval_loops` must be provided.')
 
+    eval_state = state
     outputs = None
     for step_num in self._get_eval_checkpoint_iterator():
       for eval_loop, spec in zip(self._eval_loops, eval_specs):
-        state = self._restore_state(eval_loop.step, state, step_num=step_num)
-        state, outputs = eval_loop(
-            state, iter(spec.dataset), spec.num_steps, mode=spec.mode
+        eval_state = self._restore_state(
+            eval_loop.step, state, step_num=step_num
         )
-    return state, outputs
+        eval_state, outputs = eval_loop(
+            eval_state, iter(spec.dataset), spec.num_steps, mode=spec.mode
+        )
+    return eval_state, outputs
 
   def _get_stop_loop(self, outputs: Optional[Output]) -> bool:
     """Gets the stop_loop value in the outputs.
