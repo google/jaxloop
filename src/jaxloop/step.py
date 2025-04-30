@@ -42,6 +42,33 @@ _STATE_KEYS = ('step', 'params', 'batch_stats')
 # pylint: disable=logging-fstring-interpolation
 
 
+def get_zeroed_batch(spec: BatchSpec) -> Batch:
+  """Returns a zeroed batch based on the input data spec."""
+
+  def is_shape(spec):
+    if isinstance(spec, int):
+      return True
+    return (isinstance(spec, tuple) or isinstance(spec, list)) and all(
+        isinstance(i, int) for i in spec
+    )
+
+  def map_fn(elem):
+    if is_shape(elem):
+      shape, dtype = elem, jnp.float32
+    else:
+      shape, dtype = elem
+    return jnp.zeros(shape, dtype=dtype)
+
+  def is_leaf(spec):
+    if is_shape(spec):
+      return True
+    if isinstance(spec, tuple) and len(spec) == 2:
+      return is_leaf(spec[0])
+    return False
+
+  return jax.tree_util.tree_map(map_fn, spec, is_leaf=is_leaf)
+
+
 @typing.runtime_checkable
 class Step(Protocol):
   """The step class for JAX Linen models.
@@ -166,27 +193,6 @@ class Step(Protocol):
       The model state.
     """
 
-    def is_shape(spec):
-      if isinstance(spec, int):
-        return True
-      return (isinstance(spec, tuple) or isinstance(spec, list)) and all(
-          isinstance(i, int) for i in spec
-      )
-
-    def map_fn(elem):
-      if is_shape(elem):
-        shape, dtype = elem, jnp.float32
-      else:
-        shape, dtype = elem
-      return jnp.zeros(shape, dtype=dtype)
-
-    def is_leaf(spec):
-      if is_shape(spec):
-        return True
-      if isinstance(spec, tuple) and len(spec) == 2:
-        return is_leaf(spec[0])
-      return False
-
     def init_fn(batch):
       variables = self._model.init(self._base_prng, batch, **kwargs)
       return State.create(
@@ -195,7 +201,7 @@ class Step(Protocol):
           **{k: v for k, v in variables.items() if k in _STATE_KEYS},
       )
 
-    batch = jax.tree_util.tree_map(map_fn, spec, is_leaf=is_leaf)
+    batch = get_zeroed_batch(spec)
     if self._should_shard_batch:
       batch = self.shard_batch(batch)
     state = self._partitioner.shard_init_fn(init_fn)(batch)
