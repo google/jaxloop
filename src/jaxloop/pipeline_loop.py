@@ -18,7 +18,7 @@ import collections
 import itertools
 from typing import Any, Dict, Iterator, Optional, Tuple
 
-from jaxloop import action_loop
+from jaxloop import eval_loop
 from jaxloop import stat_loop
 from jaxloop import step as step_lib
 from jaxloop import types
@@ -31,7 +31,7 @@ State = types.TrainState
 Step = step_lib.Step
 
 
-class PipelineLoop(action_loop.ActionLoop):
+class PipelineLoop(eval_loop.EvalLoop):
   """The loop class using ML Analysis Toolkit pipeline.
 
   If users don't provide pipeline, default pipeline will be used. The
@@ -123,6 +123,8 @@ class PipelineLoop(action_loop.ActionLoop):
     Returns:
       A tuple of the model state and output.
     """
+    self._log_steps(int(state.step), num_steps)
+
     if num_steps is not None:
       dataset = itertools.islice(dataset, num_steps)
     data_source = pipeline_lib.Pipeline.new().data_source(dataset)

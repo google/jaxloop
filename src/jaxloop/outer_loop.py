@@ -15,7 +15,7 @@
 """The outer loop library for JAX models."""
 
 import dataclasses
-from typing import Any, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import Any, Iterable, Iterator, List, Optional, Tuple
 
 from absl import logging
 from etils import epath
@@ -23,7 +23,6 @@ import jax
 from jaxloop import actions
 from jaxloop import eval_loop as eval_loop_lib
 from jaxloop import loop
-from jaxloop import pipeline_loop as pipeline_loop_lib
 from jaxloop import step as step_lib
 from jaxloop import train_loop as train_loop_lib
 from jaxloop import types
@@ -59,15 +58,13 @@ class EvalSpec:
   # The number of steps to run in the eval loop.
   # If None, the eval loop will run to the end of the dataset.
   num_steps: Optional[int] = None
-  # The eval mode for running model evaluation logic.
-  # The default value is EvalMode.LOOP. For more details about EvalMode, please
-  # check out eval_loop.EvalMode.
-  mode: eval_loop_lib.EvalMode = eval_loop_lib.EvalMode.LOOP
   # The loop interval to trigger the eval loop.
   # If None, the eval loop will be triggered after every inner training loop.
   # The interval is ignored when running continuous eval without a training
   # loop.
   eval_loop_interval: Optional[int] = None
+  # Additional keyword arguments to pass to the eval loop if necessary.
+  kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -98,7 +95,7 @@ class OuterLoop:
       self,
       train_loop: Optional[train_loop_lib.TrainLoop] = None,
       eval_loops: Optional[
-          List[Union[eval_loop_lib.EvalLoop, pipeline_loop_lib.PipelineLoop]]
+          List[eval_loop_lib.EvalLoop]
       ] = None,
       checkpoint_spec: Optional[CheckpointSpec] = None,
   ):
@@ -239,7 +236,7 @@ class OuterLoop:
             eval_loop.step, state, step_num=step_num
         )
         eval_state, outputs = eval_loop(
-            eval_state, iter(spec.dataset), spec.num_steps, mode=spec.mode
+            eval_state, iter(spec.dataset), spec.num_steps
         )
     return eval_state, outputs
 
@@ -332,7 +329,7 @@ class OuterLoop:
               or self._train_loop.loop_count % spec.eval_loop_interval == 0
           ):
             state, eval_outputs = eval_loop(
-                state, iter(spec.dataset), spec.num_steps, mode=spec.mode
+                state, iter(spec.dataset), spec.num_steps
             )
             stop_loop = stop_loop or self._get_stop_loop(eval_outputs)
 

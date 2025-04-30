@@ -15,16 +15,13 @@
 """Unit tests for eval loop."""
 
 from typing import Optional, Tuple
-from unittest import mock
 
 from absl.testing import absltest
 from absl.testing import parameterized
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
-from jaxloop import eval_loop
-from jaxloop import loop
-from jaxloop import pipeline_loop
+from jaxloop import eval_loop as eval_loop_lib
 from jaxloop import step as step_lib
 from jaxloop import types
 
@@ -50,47 +47,15 @@ class TestStep(Step):
 
 
 class EvalLoopTest(parameterized.TestCase):
-
-  @parameterized.named_parameters(
-      dict(testcase_name='loop', mode=eval_loop.EvalMode.LOOP),
-      dict(testcase_name='pipeline', mode=eval_loop.EvalMode.PIPELINE),
-  )
-  def test_eval_loop(self, mode: eval_loop.EvalMode):
+  def test_eval_loop(self):
     shape = [1, 28, 28, 1]
     model = TestModel()
     dataset = iter([jnp.ones(shape)] * 10)
     test_step = TestStep(jax.random.PRNGKey(0), model)
     state = test_step.initialize_model(shape)
-    loop = eval_loop.EvalLoop(test_step)
-    _, result = loop(state, dataset, mode=mode)
+    eval_loop = eval_loop_lib.EvalLoop(test_step)
+    _, result = eval_loop(state, dataset)
     self.assertEqual(result['step'], [1] * 10)
-
-  @parameterized.named_parameters(
-      dict(testcase_name='loop', mode=eval_loop.EvalMode.LOOP),
-      dict(testcase_name='pipeline', mode=eval_loop.EvalMode.PIPELINE),
-  )
-  @mock.patch.object(pipeline_loop.PipelineLoop, 'run', autospec=True)
-  @mock.patch.object(loop.Loop, 'run', autospec=True)
-  def test_eval_loop_with_mock(
-      self,
-      loop_run: mock.Mock,
-      pipeline_loop_run: mock.Mock,
-      mode: eval_loop.EvalMode,
-  ):
-    shape = [1, 28, 28, 1]
-    model = TestModel()
-    dataset = iter([jnp.ones(shape)] * 10)
-    test_step = TestStep(jax.random.PRNGKey(0), model)
-    state = test_step.initialize_model(shape)
-    pipeline_loop_run.return_value = (state, None)
-    loop_run.return_value = (state, None)
-    eval_loop.EvalLoop(test_step)(state, dataset, mode=mode)
-    if mode == eval_loop.EvalMode.LOOP:
-      loop_run.assert_called_once()
-      pipeline_loop_run.assert_not_called()
-    if mode == eval_loop.EvalMode.PIPELINE:
-      loop_run.assert_not_called()
-      pipeline_loop_run.assert_called_once()
 
 
 if __name__ == '__main__':
