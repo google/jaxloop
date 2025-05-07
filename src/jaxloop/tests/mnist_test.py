@@ -65,6 +65,7 @@ def mnist_datasets(batch_size, data_dir):
       .batch(batch_size, drop_remainder=True)
       .prefetch(tf.data.AUTOTUNE)
       .cache()
+      .repeat()
   )
   return train_ds, eval_ds
 
@@ -155,6 +156,22 @@ class IteratorTrainLoop(train_loop_lib.TrainLoop):
   ) -> tuple[State, Optional[Output]]:
     self.enforced_dataset = dataset
     return super().run(state, dataset, num_steps)
+
+
+class EvalFirstOnly:
+  """A Callable that returns True only on the first call."""
+
+  def __init__(self):
+    self._has_evaled = False
+
+  def set_evaled(self):
+    self._has_evaled = True
+
+  def __call__(self, context: outer_loop_lib.EvalContext) -> bool:
+    if self._has_evaled:
+      return False
+    self.set_evaled()
+    return True
 
 
 class MnistTest(absltest.TestCase):
@@ -303,6 +320,7 @@ class MnistTest(absltest.TestCase):
         self.eval_ds.as_numpy_iterator(),
         num_steps=100,
     )
+    self.assertEqual(eval_loop.loop_count, 1)
     self.assertLen(outputs['loss'], 100)
     self.assertLen(outputs['accuracy'], 100)
 
@@ -320,13 +338,18 @@ class MnistTest(absltest.TestCase):
         train_loop_steps=10,
         eval_specs=eval_specs,
     )
+    self.assertEqual(eval_loop.loop_count, 10)
     self.assertEqual(state.step, 100)
     self.assertLen(outputs['loss'], 10)
     self.assertLen(outputs['accuracy'], 10)
 
   def test_continuous_eval(self):
+    checkpoints_count = 2
+
     ckpt_writer = checkpoint.Checkpointer(checkpoint.PyTreeCheckpointHandler())
-    ckpt_manager_options = checkpoint.CheckpointManagerOptions(max_to_keep=3)
+    ckpt_manager_options = checkpoint.CheckpointManagerOptions(
+        max_to_keep=checkpoints_count
+    )
     checkpoint_dir = epath.Path(
         os.path.join(self.create_tempdir().full_path, 'checkpoints')
     )
@@ -336,7 +359,7 @@ class MnistTest(absltest.TestCase):
 
     def spawn_checkpoints():
       initial_state = self.train_step.initialize_model([1, 28, 28, 1])
-      for step in range(1, 3):
+      for step in range(1, checkpoints_count + 1):
         ckpt_manager.save(
             step=step,
             items=jax.device_get(initial_state),
@@ -347,19 +370,56 @@ class MnistTest(absltest.TestCase):
       ).open('w')
       f.close()
 
-    eval_loop = eval_loop_lib.EvalLoop(self.eval_step)
+    def test_should_eval(context: outer_loop_lib.EvalContext) -> bool:
+      return context.step_num % 2 == 0
+
+    eval_loop1 = eval_loop_lib.EvalLoop(self.eval_step)
+    eval_loop2 = eval_loop_lib.EvalLoop(self.eval_step)
+    eval_loop3 = eval_loop_lib.EvalLoop(self.eval_step)
+    eval_loop4 = eval_loop_lib.EvalLoop(self.eval_step)
     outer_loop = outer_loop_lib.OuterLoop(
-        eval_loops=[eval_loop],
+        eval_loops=[eval_loop1, eval_loop2, eval_loop3, eval_loop4],
         checkpoint_spec=outer_loop_lib.CheckpointSpec(
             checkpoint_dir=checkpoint_dir
         ),
     )
-    eval_specs = [outer_loop_lib.EvalSpec(dataset=self.eval_ds, num_steps=100)]
+
+    never_eval_callable = EvalFirstOnly()
+    never_eval_callable.set_evaled()
+
+    eval_specs = [
+        outer_loop_lib.EvalSpec(
+            dataset=self.eval_ds.as_numpy_iterator(), num_steps=100
+        ),
+        outer_loop_lib.EvalSpec(
+            dataset=self.eval_ds.as_numpy_iterator(),
+            num_steps=100,
+            should_eval_fn=test_should_eval,
+        ),
+        outer_loop_lib.EvalSpec(
+            dataset=self.eval_ds.as_numpy_iterator(),
+            num_steps=100,
+            should_eval_fn=EvalFirstOnly(),
+        ),
+        outer_loop_lib.EvalSpec(
+            dataset=self.eval_ds.as_numpy_iterator(),
+            num_steps=100,
+            should_eval_fn=never_eval_callable,
+        ),
+    ]
     threading.Thread(target=spawn_checkpoints).start()
+    ckpt_manager.wait_until_finished()
+    time.sleep(3)
     state, outputs = outer_loop(
         self.state,
         eval_specs=eval_specs,
     )
+
+    self.assertEqual(eval_loop1.loop_count, checkpoints_count)
+    self.assertEqual(eval_loop2.loop_count, checkpoints_count // 2)
+    self.assertEqual(eval_loop3.loop_count, 1)
+    self.assertEqual(eval_loop4.loop_count, 0)
+
     self.assertEqual(state.step, 0)
     self.assertLen(outputs['loss'], 100)
     self.assertLen(outputs['accuracy'], 100)
@@ -395,6 +455,7 @@ class MnistTest(absltest.TestCase):
         self.state,
         eval_specs=eval_specs,
     )
+    self.assertEqual(eval_loop.loop_count, 1)
     self.assertEqual(state.step, 0)
     self.assertLen(outputs['loss'], 100)
     self.assertLen(outputs['accuracy'], 100)
@@ -594,6 +655,7 @@ class MnistTest(absltest.TestCase):
         list(restored.params.keys()),
         ['Conv_0', 'Conv_1', 'Dense_0', 'Dense_1'],
     )
+
 
 if __name__ == '__main__':
   absltest.main()

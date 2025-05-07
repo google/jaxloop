@@ -15,7 +15,7 @@
 """The outer loop library for JAX models."""
 
 import dataclasses
-from typing import Any, Iterable, Iterator, List, Optional, Tuple
+from typing import Any, Iterable, Iterator, List, Optional, Protocol, Tuple
 
 from absl import logging
 from etils import epath
@@ -45,26 +45,79 @@ _STOP_FILE_NAME = 'STOPPED'
 _DEFAULT_CHECKPOINT_TIMEOUT = 0
 
 
-@dataclasses.dataclass(frozen=True)
+class EvalContext:
+  """The context in which the eval loop is running.
+
+  Attributes:
+    is_continuous_eval: Whether the eval loop is running continuously.
+    step_num: If in continuous eval mode, this is the step number of the
+      checkpoint being evaluated. If in non-continuous eval mode, this is the
+      step number of the training loop.
+    loop_count: The number of training loops that have been run. In continuous
+      eval mode, this number will always be 0.
+  """
+
+  is_continuous_eval: bool
+  step_num: int
+  loop_count: int
+
+  def __init__(
+      self,
+      is_continuous_eval: bool,
+      step_num: int,
+      loop_count: int,
+      **_: dict[str, Any],
+  ):
+    self.is_continuous_eval = is_continuous_eval
+    self.step_num = step_num
+    self.loop_count = loop_count
+
+
+class ShouldEvalFn(Protocol):
+  """The function to determine whether to run the eval loop."""
+
+  def __call__(self, context: EvalContext) -> bool:
+    ...
+
+
 class EvalSpec:
   """The eval loop configuration.
 
   For every eval loop in the outer loop, create a eval spec to control how to
   run the eval loop. There is a one to one match for eval loop and eval spec.
+
+  Attributes:
+    dataset: The dataset used in the eval loop.
+    num_steps: The number of steps to run in the eval loop. If None, the eval
+      loop will run to the end of the dataset.
+    eval_loop_interval: The loop interval to trigger the eval loop. If None, the
+      eval loop will be triggered after every inner training loop. The interval
+      is always applied.
+    should_eval_fn: An optional function to determine whether to run the eval
+      loop. The function argument is an :class:`EvalContext` dataclass object.
+      When this function is provided, it is used in parallel to
+      eval_loop_interval above i.e. both this function and eval_loop_interval
+      must be satisfied for the eval loop to run.
+    kwargs: Additional keyword arguments to pass to the eval loop if necessary.
   """
 
-  # The dataset used in the eval loop.
   dataset: Iterable[Any]
-  # The number of steps to run in the eval loop.
-  # If None, the eval loop will run to the end of the dataset.
   num_steps: Optional[int] = None
-  # The loop interval to trigger the eval loop.
-  # If None, the eval loop will be triggered after every inner training loop.
-  # The interval is ignored when running continuous eval without a training
-  # loop.
   eval_loop_interval: Optional[int] = None
-  # Additional keyword arguments to pass to the eval loop if necessary.
-  kwargs: dict[str, Any] = dataclasses.field(default_factory=dict)
+  should_eval_fn: Optional[ShouldEvalFn] = None
+
+  def __init__(
+      self,
+      dataset: Iterable[Any],
+      num_steps: Optional[int] = None,
+      eval_loop_interval: Optional[int] = None,
+      should_eval_fn: Optional[ShouldEvalFn] = None,
+      **_: dict[str, Any],
+  ):
+    self.dataset = dataset
+    self.num_steps = num_steps
+    self.eval_loop_interval = eval_loop_interval
+    self.should_eval_fn = should_eval_fn
 
 
 @dataclasses.dataclass(frozen=True)
@@ -94,9 +147,7 @@ class OuterLoop:
   def __init__(
       self,
       train_loop: Optional[train_loop_lib.TrainLoop] = None,
-      eval_loops: Optional[
-          List[eval_loop_lib.EvalLoop]
-      ] = None,
+      eval_loops: Optional[List[eval_loop_lib.EvalLoop]] = None,
       checkpoint_spec: Optional[CheckpointSpec] = None,
   ):
     """Initializes the outer loop.
@@ -232,6 +283,15 @@ class OuterLoop:
     outputs = None
     for step_num in self._get_eval_checkpoint_iterator():
       for eval_loop, spec in zip(self._eval_loops, eval_specs):
+        if spec.should_eval_fn is not None and not spec.should_eval_fn(
+            EvalContext(
+                is_continuous_eval=True,
+                step_num=step_num,
+                loop_count=0,
+            )
+        ):
+          continue
+
         eval_state = self._restore_state(
             eval_loop.step, state, step_num=step_num
         )
@@ -325,13 +385,23 @@ class OuterLoop:
       if self._eval_loops is not None and eval_specs is not None:
         for eval_loop, spec in zip(self._eval_loops, eval_specs):
           if (
-              spec.eval_loop_interval is None
-              or self._train_loop.loop_count % spec.eval_loop_interval == 0
+              spec.eval_loop_interval is not None
+              and self._train_loop.loop_count % spec.eval_loop_interval != 0
           ):
-            state, eval_outputs = eval_loop(
-                state, iter(spec.dataset), spec.num_steps
-            )
-            stop_loop = stop_loop or self._get_stop_loop(eval_outputs)
+            continue
+          elif spec.should_eval_fn is not None and not spec.should_eval_fn(
+              EvalContext(
+                  is_continuous_eval=False,
+                  step_num=self._train_loop.loop_count * train_loop_steps,
+                  loop_count=self._train_loop.loop_count,
+              )
+          ):
+            continue
+
+          state, eval_outputs = eval_loop(
+              state, iter(spec.dataset), spec.num_steps
+          )
+          stop_loop = stop_loop or self._get_stop_loop(eval_outputs)
 
     # Make sure that the CheckpointManager is properly closed, and all the write
     # in threads are committed.
