@@ -79,7 +79,7 @@ class ActionLoop(stat_loop.StatLoop):
       A tuple of the model state and output.
     """
     state, outputs = super().end(state, outputs)
-    jax.block_until_ready(outputs)
+    jax.block_until_ready((state, outputs))
     if self._end_actions is not None:
       for action in self._end_actions:
         if self._loop_count % action.interval == 0:
