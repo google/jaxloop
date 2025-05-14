@@ -179,6 +179,10 @@ class Step(Protocol):
           'model_args should only be provided when initializing an nnx.Module.'
       )
 
+  def preprocess_batch(self, batch: Batch) -> Batch:
+    """Preprocesses the input data batch before running the step."""
+    return batch
+
   def initialize_model(
       self, spec: BatchSpec, log_num_params: bool = False, **kwargs
   ) -> State:
@@ -202,6 +206,7 @@ class Step(Protocol):
       )
 
     batch = get_zeroed_batch(spec)
+    batch = self.preprocess_batch(batch)
     if self._should_shard_batch:
       batch = self.shard_batch(batch)
     state = self._partitioner.shard_init_fn(init_fn)(batch)
@@ -395,6 +400,7 @@ class Step(Protocol):
     if self._cached_run is None:
       self.compile()
 
+    batch = self.preprocess_batch(batch)
     if self._should_shard_batch:
       batch = self.shard_batch(batch)
     self._run_begin_actions(state, per_loop_step_number)
