@@ -36,9 +36,6 @@ BatchSpec = types.BatchSpec
 Output = types.Output
 State = types.TrainState
 
-_DEFAULT_ITEM_NAME = 'default'
-_STATE_KEYS = ('step', 'params', 'batch_stats')
-
 # pylint: disable=logging-fstring-interpolation
 
 
@@ -125,10 +122,14 @@ class Step(Protocol):
       field is only used when model is an nnx.Module Type and ignored otherwise.
     begin_actions: The actions to be run at the beginning of the step.
     end_actions: The actions to be run at the end of the step. Note, including
-    such actions, when triggered on a particular step, will require all JAX
-    computations to be finished before the action can be invoked. This can cause
-    a slight performance penalty for such steps.
+      such actions, when triggered on a particular step, will require all JAX
+      computations to be finished before the action can be invoked. This can
+      cause a slight performance penalty for such steps.
+    chkpt_item_name: The name of the checkpoint item to be restored. See Orbax
+      Checkpointer for more details.
   """
+
+  _STATE_KEYS = ('step', 'params', 'batch_stats')
 
   def __init__(
       self,
@@ -141,6 +142,7 @@ class Step(Protocol):
       nnx_model_args: Optional[Tuple[Any, ...]] = None,
       begin_actions: Optional[list[actions.Action]] = None,
       end_actions: Optional[list[actions.Action]] = None,
+      chkpt_item_name: str = 'default',
       **nnx_model_kwargs: Any,
   ):
     self._nnx_precheck(model, nnx_model_args)
@@ -164,6 +166,7 @@ class Step(Protocol):
     self._num_flops = None
     self._begin_actions = begin_actions
     self._end_actions = end_actions
+    self._chkpt_item_name = chkpt_item_name
 
   def _nnx_precheck(
       self,
@@ -202,7 +205,7 @@ class Step(Protocol):
       return State.create(
           apply_fn=self._model.apply,
           tx=self._optimizer,
-          **{k: v for k, v in variables.items() if k in _STATE_KEYS},
+          **{k: v for k, v in variables.items() if k in self._STATE_KEYS},
       )
 
     batch = get_zeroed_batch(spec)
@@ -489,8 +492,8 @@ class Step(Protocol):
             checkpoint_dir, ocp.path.step.standard_name_format(), step
         ),
         args=ocp.args.Composite(**{
-            _DEFAULT_ITEM_NAME: ocp.args.PyTreeRestore(
+            self._chkpt_item_name: ocp.args.PyTreeRestore(
                 abstract_state, **restore_kwargs
             )  # pytype: disable=wrong-arg-count
         }),
-    )[_DEFAULT_ITEM_NAME]
+    )[self._chkpt_item_name]

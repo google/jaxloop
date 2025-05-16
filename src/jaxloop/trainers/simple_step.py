@@ -1,5 +1,6 @@
 """A simple jaxloop step implementation that performs a simple forward pass with an MSE loss function."""
 
+import logging
 from typing import Tuple
 
 import clu.metrics as clu_metrics
@@ -57,13 +58,39 @@ class SimpleStep(step.Step):
   """
 
   def initialize_model(
-      self, spec: types.BatchSpec, log_num_params: bool = False, **kwargs
-  ) -> types.TrainState:
-    input_spec = self._get_input_features(spec)
+      self, spec: step.BatchSpec, log_num_params: bool = False, **kwargs
+  ) -> step.State:
+    """Initializes the model state based on the input batch.
 
-    return super().initialize_model(
-        input_spec, log_num_params=log_num_params, **kwargs
-    )
+    Args:
+      spec: The input batch data spec.
+      log_num_params: Whether to log the number of parameters of the model.
+      **kwargs: Additional keyword arguments to initialize the model.
+
+    Returns:
+      The model state.
+    """
+
+    def init_fn(batch):
+      variables = self._model.init(
+          self._base_prng, self._get_input_features(batch), **kwargs
+      )
+      return step.State.create(
+          apply_fn=self._model.apply,
+          tx=self._optimizer,
+          **{k: v for k, v in variables.items() if k in self._STATE_KEYS},
+      )
+
+    batch = step.get_zeroed_batch(spec)
+    batch = self.preprocess_batch(batch)
+    if self._should_shard_batch:
+      batch = self.shard_batch(batch)
+    state = self._partitioner.shard_init_fn(init_fn)(batch)
+    if log_num_params:
+      if self._num_params is None:
+        self.compute_num_params(state)
+      logging.info("Initialized model with %d parameters.", self.num_params)
+    return state
 
   def run(
       self, state: step.State, batch: step.Batch
@@ -99,7 +126,35 @@ class SimpleStep(step.Step):
     Returns:
       The input features of the batch.
     """
+    if isinstance(batch, types.Array):
+      return batch
+
     return batch["input_features"]
+
+  def _update_input_features(
+      self, batch: step.Batch, updated_input_features: types.Array
+  ) -> step.Batch:
+    """Updates the input features in the batch.
+
+    By default, the input features are stored in the key "input_features". If
+    this is not the case, this method can be overridden to update the input
+    features in the batch.
+
+    Args:
+      batch: One batch of data from the dataset.
+      updated_input_features: The updated input features.
+
+    Returns:
+      The updated batch.
+    """
+    if not isinstance(batch, dict):
+      return updated_input_features
+
+    input_features = self._get_input_features(batch)
+    return {
+        "input_features": input_features,
+        **{k: v for k, v in batch.items() if k != "input_features"},
+    }
 
   def _get_output_features(self, batch: step.Batch) -> jaxtyping.PyTree:
     """Extracts the output features from the batch.
