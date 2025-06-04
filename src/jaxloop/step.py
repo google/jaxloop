@@ -447,7 +447,13 @@ class Step(Protocol):
       self.compile()
 
     assert self._cached_run is not None  # Make Pytype happy.
-    analysis = self._cached_run.lower(state, batch).compile().cost_analysis()
+
+    # Pathways only supports cost_analysis() on a compiled function.
+    if 'pathways' in jax.local_devices()[0].client.runtime_type:
+      analysis = self._cached_run.lower(state, batch).compile().cost_analysis()
+    else:
+      analysis = self._cached_run.lower(state, batch).cost_analysis()
+
     self._num_flops = analysis.get('flops', 0)
     return self.num_flops
 
