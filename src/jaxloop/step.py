@@ -30,6 +30,8 @@ import optax
 import orbax.checkpoint as ocp
 from orbax.checkpoint import checkpoint_utils
 
+from google3.pyglib import gfile
+
 DType = types.DType
 Batch = types.Batch
 BatchSpec = types.BatchSpec
@@ -143,6 +145,11 @@ class Step(Protocol):
       begin_actions: Optional[list[actions.Action]] = None,
       end_actions: Optional[list[actions.Action]] = None,
       chkpt_item_name: str = 'default',
+      debug_dump_location: str = '',
+      dump_hlo: bool = False,
+      dump_stable_hlo: bool = False,
+      dump_jaxpr: bool = False,
+      dump_jaxpr_with_symbols: bool = False,
       **nnx_model_kwargs: Any,
   ):
     self._nnx_precheck(model, nnx_model_args)
@@ -167,6 +174,11 @@ class Step(Protocol):
     self._begin_actions = begin_actions
     self._end_actions = end_actions
     self._chkpt_item_name = chkpt_item_name
+    self._debug_dump_location = debug_dump_location
+    self._dump_hlo = dump_hlo
+    self._dump_stable_hlo = dump_stable_hlo
+    self._dump_jaxpr = dump_jaxpr
+    self._dump_jaxpr_with_symbols = dump_jaxpr_with_symbols
 
   def _nnx_precheck(
       self,
@@ -410,6 +422,8 @@ class Step(Protocol):
     state, batch = self.begin(state, batch)
 
     if log_num_flops and self.num_flops is None:
+      if self._debug_dump_location:
+        self.dump_debug_info(state, batch)
       self.compute_num_flops(state, batch)
       logging.info(f'Step flops: {self.num_flops}')
 
@@ -450,6 +464,46 @@ class Step(Protocol):
     analysis = self._cached_run.lower(state, batch).compile().cost_analysis()
     self._num_flops = analysis.get('flops', 0)
     return self.num_flops
+
+  def dump_debug_info(self, state: State, batch: Batch):
+    """Dumps the debug info for the step.
+
+    Args:
+      state: The model state.
+      batch: The input data batch.
+    """
+    assert self._cached_run is not None
+    process_id = jax.process_index()
+
+    def _dump_to_cns(ir_type, ir_txt):
+      filename = f'{ir_type}_{process_id}.txt'
+      ir_path = epath.Path(self._debug_dump_location) / filename
+      ir_path.parent.mkdir(parents=True, exist_ok=True)
+      with gfile.Open(ir_path, 'w') as f:
+        f.write(ir_txt)
+
+    jit_run = self._cached_run.lower(state, batch)  # pylint: disable=attribute-error
+    jit_run_jaxpr = jax.make_jaxpr(self._cached_run)(state, batch)
+
+    if self._dump_hlo:
+      hlo = jit_run.compiler_ir('hlo')
+      hlo_txt = hlo.as_hlo_text()
+      _dump_to_cns('hlo', hlo_txt)
+    if self._dump_stable_hlo:
+      stablehlo_txt = jit_run.as_text('stablehlo')
+      _dump_to_cns('stablehlo', stablehlo_txt)
+    if self._dump_jaxpr:
+      jaxpr_txt_without_source = str(
+          jit_run_jaxpr.pretty_print(use_color=False, source_info=False)  # pylint: disable=attribute-error
+      )
+      _dump_to_cns('jaxpr_without_source', jaxpr_txt_without_source)
+    if self._dump_jaxpr_with_symbols:
+      # The following line uses a TON of CNS quota. Be mindful when you dump
+      # Jaxpr with source info.
+      jaxpr_txt_with_source = str(
+          jit_run_jaxpr.pretty_print(use_color=False, source_info=True)  # pylint: disable=attribute-error
+      )
+      _dump_to_cns('jaxpr_with_source', jaxpr_txt_with_source)
 
   @property
   def train(self) -> bool:
