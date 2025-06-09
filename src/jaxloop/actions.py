@@ -188,7 +188,7 @@ class CheckpointAction(Action):
     return self._ckpt_manager.save(
         step,
         metrics=self._data_transfer_fn(outputs),
-        items=self._data_transfer_fn(state),
+        args=ocp.args.PyTreeSave(self._data_transfer_fn(state)),
     )
 
   def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:

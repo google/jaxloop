@@ -280,7 +280,7 @@ class MnistTest(absltest.TestCase):
     )
     ckpt_manager.save(
         step=step,
-        items=jax.device_get(ckpt_state),
+        args=checkpoint.args.PyTreeSave(jax.device_get(ckpt_state)),
     )
 
     train_loop = train_loop_lib.TrainLoop(self.train_step)
@@ -362,7 +362,7 @@ class MnistTest(absltest.TestCase):
       for step in range(1, checkpoints_count + 1):
         ckpt_manager.save(
             step=step,
-            items=jax.device_get(initial_state),
+            args=checkpoint.args.PyTreeSave(jax.device_get(initial_state)),
         )
         time.sleep(3)
       f = epath.Path(
@@ -438,7 +438,7 @@ class MnistTest(absltest.TestCase):
     initial_state = self.train_step.initialize_model([1, 28, 28, 1])
     ckpt_manager.save(
         step=1,
-        items=jax.device_get(initial_state),
+        args=checkpoint.args.PyTreeSave(jax.device_get(initial_state)),
     )
 
     eval_loop = eval_loop_lib.EvalLoop(self.eval_step)

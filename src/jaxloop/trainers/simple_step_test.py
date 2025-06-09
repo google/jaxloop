@@ -79,7 +79,8 @@ class StepTest(absltest.TestCase):
 
   def test_restore_model(self):
     state = self.step.initialize_model(self.spec)
-    self.checkpoint_manager.save(0, state)
+    self.checkpoint_manager.save(0, args=checkpoint.args.PyTreeSave(state))
+    self.checkpoint_manager.wait_until_finished()
     state = self.step.restore_model(state, self.checkpoint_dir)
     self.assertEqual(state.step, 0)
     self.assertIn('Dense_0', state.params)
