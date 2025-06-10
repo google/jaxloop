@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from typing import Optional, Type
 
+from clu import metric_writers
 import flax.linen as nn
 import jax
 from jaxloop import action_loop as action_loop_lib
@@ -34,6 +35,7 @@ class SimpleTrainer:
     batch_spec: The batch spec of the model.
     checkpointing_config: The checkpointing config; if None, no checkpointing
       will be performed.
+    summary_config: The summary config; if None, no summaries will be written.
     log_num_params: Whether to log the number of parameters during
     initialization.
     optimizer: The optimizer to use.
@@ -55,6 +57,7 @@ class SimpleTrainer:
       steps_per_epoch: int,
       batch_spec: types.BatchSpec,
       checkpointing_config: Optional[trainer_utils.CheckpointingConfig] = None,
+      summary_config: Optional[trainer_utils.SummaryConfig] = None,
       log_num_params: bool = False,
       optimizer: optax.GradientTransformation = optax.adam(1e-4),
       partioner: partition.Partitioner = partition.SingleDevicePartitioner(),
@@ -77,6 +80,7 @@ class SimpleTrainer:
     self._batch_spec = batch_spec
     self._log_num_params = log_num_params
     self._checkpointing_config = checkpointing_config
+    self._summary_config = summary_config
 
     if base_prng is None:
       base_prng = {"params": jax.random.PRNGKey(0)}
@@ -141,6 +145,21 @@ class SimpleTrainer:
       end_actions.append(
           actions.CheckpointAction(
               ckpt_manager, self._checkpointing_config.checkpoint_interval
+          )
+      )
+
+    if self._summary_config is not None:
+      train_metrics_writer = metric_writers.create_default_writer(
+          self._summary_config.path,
+          just_logging=jax.process_index() > 0,
+          asynchronous=self._summary_config.asynchronous,
+      )
+
+      begin_actions.append(
+          actions.SummaryAction(
+              train_metrics_writer,
+              interval=self._summary_config.interval,
+              flush_each_call=self._summary_config.flush_each_call,
           )
       )
 

@@ -1,5 +1,6 @@
 """Utility functions and classes to simplify trainers usage."""
 
+import dataclasses
 from etils import epath
 from jaxloop import outer_loop
 
@@ -27,3 +28,13 @@ class CheckpointingConfig:
     if isinstance(checkpoint_dir, str):
       checkpoint_dir = epath.Path(checkpoint_dir)
     return outer_loop.CheckpointSpec(checkpoint_dir=checkpoint_dir)
+
+
+@dataclasses.dataclass(frozen=True)
+class SummaryConfig:
+  """Configuration for writing summaries."""
+
+  path: str | epath.Path
+  interval: int = 1
+  flush_each_call: bool = False
+  asynchronous: bool = True
