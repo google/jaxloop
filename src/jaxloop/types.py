@@ -65,7 +65,7 @@ class MetricWithMetadata:
   metadata: dict[str, Any] | None = None
 
 
-Batch = Union[Array, Dict[str, Array], Dict[str, Dict[str, Array]] ]
+Batch = Union[Array, Dict[str, Array]]
 Output = Dict[str, Any]
 Shape = Union[int, Tuple[int], List[int]]
 DType = jnp.dtype
@@ -74,7 +74,6 @@ BatchSpec = Union[
     Shape,
     Tuple[Shape, Optional[DType]],
     Dict[str, Union[Shape, Tuple[Shape, Optional[DType]]]],
-    Dict[str, Dict[str, Union[Shape, Tuple[Shape, Optional[DType]]]]],
 ]
 MetricsDict = Dict[str, Union[Scalar, Array, MetricWithMetadata]]
 CluMetricType = Union[clu_metrics.Metric, clu_metrics.Collection]
