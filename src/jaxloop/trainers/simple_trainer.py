@@ -38,6 +38,13 @@ class SimpleTrainer:
     initialization.
     optimizer: The optimizer to use.
     partioner: The partitioner to use.
+    step_class: The step class to use.
+    train_loop_class: The train loop class to use.
+    eval_loop_class: The eval loop class to use.
+    outer_loop_class: The outer loop class to use.
+    base_prng: The base prng to use.
+    additional_begin_actions: Additional begin actions to perform.
+    additional_end_actions: Additional end actions to perform.
     **kwargs: Keyword arguments to pass to the step and loop constructors.
   """
 
@@ -60,6 +67,8 @@ class SimpleTrainer:
       ] = action_loop_lib.ActionLoop,
       outer_loop_class: Type[outer_loop.OuterLoop] = outer_loop.OuterLoop,
       base_prng: types.PRNGType | None = None,
+      additional_begin_actions: list[actions.Action] = [],
+      additional_end_actions: list[actions.Action] = [],
       **kwargs,
   ):
     self._model = model
@@ -80,7 +89,9 @@ class SimpleTrainer:
         partitioner=partioner,
         **kwargs,
     )
-    begin_actions, end_actions = self._build_actions()
+    begin_actions, end_actions = self._build_actions(
+        additional_begin_actions, additional_end_actions
+    )
     self._train_loop = train_loop_class(
         step=self._train_step,
         begin_actions=begin_actions,
@@ -109,10 +120,14 @@ class SimpleTrainer:
 
     self._setup(**kwargs)
 
-  def _build_actions(self) -> tuple[list[actions.Action], list[actions.Action]]:
+  def _build_actions(
+      self,
+      additional_begin_actions: list[actions.Action],
+      additional_end_actions: list[actions.Action],
+  ) -> tuple[list[actions.Action], list[actions.Action]]:
     """Builds the actions for the train and eval loops."""
-    begin_actions = []
-    end_actions = []
+    begin_actions = additional_begin_actions
+    end_actions = additional_end_actions
     if self._checkpointing_config is not None:
       ckpt_manager = checkpoint.CheckpointManager(
           self._checkpointing_config.checkpoint_spec.checkpoint_dir
