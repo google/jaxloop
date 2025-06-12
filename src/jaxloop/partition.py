@@ -65,6 +65,12 @@ class Partitioner(abc.ABC):
     """Gets the mesh."""
     pass
 
+  @property
+  @abc.abstractmethod
+  def data_axis(self) -> str | None:
+    """Gets the data axis."""
+    pass
+
 
 class SingleDevicePartitioner(Partitioner):
   """A simple partitioner for single device use case."""
@@ -94,6 +100,10 @@ class SingleDevicePartitioner(Partitioner):
   @property
   def mesh(self) -> jax.sharding.Mesh | None:
     return self._mesh
+
+  @property
+  def data_axis(self) -> str | None:
+    return None
 
 
 class DataParallelPartitioner(SingleDevicePartitioner):
@@ -139,6 +149,14 @@ class DataParallelPartitioner(SingleDevicePartitioner):
         donate_argnames='state',
         **kwargs,
     )
+
+  @property
+  def mesh(self) -> jax.sharding.Mesh | None:
+    return self._mesh
+
+  @property
+  def data_axis(self) -> str | None:
+    return self._data_axis
 
 
 class SPMDPartitioner(SingleDevicePartitioner):
@@ -189,6 +207,14 @@ class SPMDPartitioner(SingleDevicePartitioner):
         donate_argnames='state',
         **kwargs,
     )
+
+  @property
+  def mesh(self) -> jax.sharding.Mesh | None:
+    return self._mesh
+
+  @property
+  def data_axis(self) -> str | None:
+    return self._data_axis
 
 
 def _reshard_for_pjit(mesh, data_axis, batch):
