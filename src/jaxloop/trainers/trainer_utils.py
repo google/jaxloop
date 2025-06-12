@@ -1,8 +1,18 @@
 """Utility functions and classes to simplify trainers usage."""
 
 import dataclasses
+from typing import Dict, Optional, Tuple, Union
 from etils import epath
 from jaxloop import outer_loop
+from jaxloop import types
+
+TrainerBatchSpec = Dict[
+    str,
+    Dict[
+        str,
+        Union[types.Shape, Tuple[types.Shape, Optional[types.DType]]],
+    ],
+]
 
 
 class CheckpointingConfig:

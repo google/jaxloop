@@ -121,7 +121,9 @@ class SimpleTrainerTest(absltest.TestCase):
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
         batch_spec=self.spec,
-        partioner=partition.DataParallelPartitioner(data_parallel_mesh, 'data'),
+        partitioner=partition.DataParallelPartitioner(
+            data_parallel_mesh, 'data'
+        ),
     )
 
     trainer.train(self.batches)

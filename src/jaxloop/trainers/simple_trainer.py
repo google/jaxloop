@@ -55,12 +55,12 @@ class SimpleTrainer:
       model: nn.Module,
       epochs: int,
       steps_per_epoch: int,
-      batch_spec: types.BatchSpec,
+      batch_spec: types.BatchSpec | trainer_utils.TrainerBatchSpec,
       checkpointing_config: Optional[trainer_utils.CheckpointingConfig] = None,
       summary_config: Optional[trainer_utils.SummaryConfig] = None,
       log_num_params: bool = False,
       optimizer: optax.GradientTransformation = optax.adam(1e-4),
-      partioner: partition.Partitioner = partition.SingleDevicePartitioner(),
+      partitioner: partition.Partitioner = partition.SingleDevicePartitioner(),
       step_class: Type[step.Step] = simple_step.SimpleStep,
       train_loop_class: Type[
           train_loop_lib.TrainLoop
@@ -90,7 +90,7 @@ class SimpleTrainer:
         base_prng=base_prng,
         train=True,
         optimizer=optimizer,
-        partitioner=partioner,
+        partitioner=partitioner,
         **kwargs,
     )
     begin_actions, end_actions = self._build_actions(
