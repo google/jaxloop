@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from jaxloop import partition
 from jaxloop import train_loop as train_loop_lib
 from jaxloop import types
+from jaxloop.trainers import data_loader
 from jaxloop.trainers import simple_trainer
 from jaxloop.trainers import trainer_utils
 
@@ -57,6 +58,10 @@ class SimpleTrainerTest(absltest.TestCase):
         }
         for _ in range(self.epochs * self.steps_per_epoch)
     ]
+    self.dataset = {
+        'input_features': jnp.ones([self.epochs * self.steps_per_epoch, 3]),
+        'output_features': jnp.ones([self.epochs * self.steps_per_epoch, 1]),
+    }
 
   def test_basic_training(self):
     trainer = simple_trainer.SimpleTrainer(
@@ -153,6 +158,25 @@ class SimpleTrainerTest(absltest.TestCase):
     self.assertTrue(checkpoint_dir.exists())
     self.assertTrue(epath.Path(checkpoint_dir, 'checkpoints').exists())
     self.assertLen(list(epath.Path(checkpoint_dir, 'checkpoints').iterdir()), 2)
+
+  def test_with_simple_data_loader(self):
+    trainer = simple_trainer.SimpleTrainer(
+        self.model,
+        epochs=self.epochs,
+        steps_per_epoch=self.steps_per_epoch,
+        batch_spec=self.spec,
+    )
+
+    data_iterator = iter(self.batches)
+    simple_loader = data_loader.SimpleDataLoader(dataset=data_iterator)
+
+    outputs = trainer.train(simple_loader)
+    self.assertEqual(
+        trainer.model_state.step, self.epochs * self.steps_per_epoch
+    )
+    self.assertIsNotNone(outputs)
+    self.assertIsNotNone(outputs['loss'])
+    self.assertLen(outputs['loss'], self.steps_per_epoch)
 
 
 if __name__ == '__main__':
