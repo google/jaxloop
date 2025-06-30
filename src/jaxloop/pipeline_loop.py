@@ -128,7 +128,7 @@ class PipelineLoop(eval_loop.EvalLoop):
     if num_steps is not None:
       dataset = itertools.islice(dataset, num_steps)
     data_source = pipeline_lib.Pipeline.new().data_source(dataset)
-    data_pipeline = data_source.chain(
+    data_pipeline = data_source.fuse(
         self._pipeline or self.make_pipeline(state)
     )
     return state, next(iter(data_pipeline.make()().values()))
