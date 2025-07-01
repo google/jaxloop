@@ -15,19 +15,24 @@
 """The action library for JAX models."""
 
 import collections
+from collections.abc import Mapping
+import math
 import typing
 from typing import Any, Callable, Optional, Protocol
-from collections.abc import Mapping
 
 from absl import logging
 from clu import metric_writers
 import jax
+import jax.numpy as jnp
+from jaxloop import stop_handler
 from jaxloop import types
 from jaxloop.step_number_writer import step_number_writer
 import jaxtyping
 import orbax.checkpoint as ocp
 
 
+MetricMonitoringStopHandler = stop_handler.MetricMonitoringStopHandler
+StopTrainingError = stop_handler.StopTrainingError
 Output = types.Output
 State = types.TrainState
 Scalar = types.Scalar
@@ -226,3 +231,90 @@ class StepNumberAction(Action):
   ) -> None:
     step = int(state.step)
     self._step_number_writer.write(step)
+
+
+class EarlyStoppingAction(Action):
+  """Action to trigger early stopping.
+
+  Delegates state management and stopping logic to the
+  MetricMonitoringStopHandler.
+  Typically added to 'eval_end_actions' in a Jaxloop Trainer.
+  """
+
+  def __init__(self, handler: MetricMonitoringStopHandler):
+    """Initializes the early stopping action.
+
+    Args:
+      handler: The early stopping handler to use.
+    """
+    super().__init__()
+    self._handler = handler
+    self.monitored_metric = handler.monitored_metric
+
+  def __call__(
+      self, state: State, outputs: Optional[Output], **kwargs
+  ) -> Optional[Output]:
+    """Typically called at the end of an evaluation loop.
+
+    Args:
+      state: The model state.
+      outputs: The model output.
+      **kwargs: Additional keyword arguments for the action.
+
+    Returns:
+      The unmodified outputs dictionary.
+
+    Raises:
+      StopTrainingError: If early stopping is triggered.
+    """
+    current_step = int(state.step)
+
+    if outputs is None or self.monitored_metric not in outputs:
+      logging.warning(
+          "Early stopping action '%s' is monitoring metric '%s' which is not"
+          " available in the outputs dictionary. Available metrics are: %s",
+          self.monitored_metric,
+          current_step,
+          outputs.keys() if outputs is not None else None,
+      )
+      return outputs
+
+    current_metric = float(jnp.mean(jnp.array(outputs[self.monitored_metric])))
+
+    if math.isnan(current_metric):
+      logging.error(
+          "[EarlyStoppingAction] Metric '%s' is NaN at step %d. Stopping"
+          " training.",
+          self.monitored_metric,
+          current_step,
+      )
+      best_info = self._handler.get_best_info()
+      raise StopTrainingError(
+          f"Metric '{self.monitored_metric}' was NaN",
+          best_step=best_info[1],
+          best_metric=best_info[0],
+      )
+
+    self._handler.update_state(current_metric, current_step)
+
+    if self._handler.should_stop():
+      best_metric, best_step = self._handler.get_best_info()
+
+      logging.debug(
+          "[EarlyStoppingAction] Stopping training at step %d."
+          " Metric '%s' did not improve for %d cycles. Best metric %.4f at"
+          " step %d.",
+          current_step,
+          self.monitored_metric,
+          self._handler.patience,
+          best_metric,
+          best_step,
+      )
+
+      raise StopTrainingError(
+          f"Early stopping triggered for metric '{self.monitored_metric}'",
+          best_step=best_step,
+          best_metric=best_metric,
+      )
+
+    return outputs

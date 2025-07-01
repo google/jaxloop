@@ -23,9 +23,12 @@ from absl.testing import absltest
 import chex
 import jax.numpy as jnp
 from jaxloop import actions
+from jaxloop import stop_handler
 from jaxloop import types
 from jaxloop.step_number_writer import step_number_writer
 import optax
+
+from google3.testing.pymocks import matchers
 
 
 State = types.TrainState
@@ -137,6 +140,69 @@ class SummaryActionTest(absltest.TestCase):
     with self.assertRaises(ValueError):
       action(cast(types.TrainState, MockedState(1)), outputs)
 
+
+class EarlyStoppingActionTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+
+    @dataclasses.dataclass
+    class MockedState:
+      step: int
+
+    self._mocked_state = MockedState
+
+  def test_stop_training_error(self):
+    # Mock the handler to control its output
+    mock_handler = mock.MagicMock(spec=stop_handler.MetricMonitoringStopHandler)
+    mock_handler.monitored_metric = "val_loss"
+    mock_handler.patience = 10
+    mock_handler.should_stop.return_value = True
+    mock_handler.get_best_info.return_value = (
+        0.5,  # best_metric
+        200,  # best_step
+    )
+
+    action = actions.EarlyStoppingAction(handler=mock_handler)
+    state = self._mocked_state(step=300)
+    outputs = {"val_loss": 0.6}
+
+    with self.assertRaises(stop_handler.StopTrainingError) as e:
+      action(cast(types.TrainState, state), outputs)
+
+    # Check that the error was raised with the right info
+    self.assertIn("Training stopped early.", str(e.exception))
+    self.assertEqual(e.exception.best_step, 200)
+    self.assertEqual(e.exception.best_metric, 0.5)
+    mock_handler.update_state.assert_called_once_with(
+        matchers.IS(lambda x: abs(x - 0.6) < 1e-6), 300
+    )
+
+  def test_missing_metric(self):
+    mock_handler = mock.MagicMock(spec=stop_handler.MetricMonitoringStopHandler)
+    mock_handler.monitored_metric = "val_loss"
+
+    action = actions.EarlyStoppingAction(handler=mock_handler)
+    state = self._mocked_state(step=100)
+    outputs = {"other_metric": 1.0}  # Monitored metric is missing
+
+    # Should log a warning but not raise an error
+    action(cast(types.TrainState, state), outputs)
+    mock_handler.update_state.assert_not_called()
+
+  def test_nan_metric(self):
+    # Use a real handler to test the NaN case
+    handler = stop_handler.MetricMonitoringStopHandler(
+        monitored_metric="val_loss"
+    )
+    action = actions.EarlyStoppingAction(handler=handler)
+    state = self._mocked_state(step=100)
+    outputs = {"val_loss": jnp.nan}
+
+    with self.assertRaises(stop_handler.StopTrainingError) as e:
+      action(cast(types.TrainState, state), outputs)
+
+    self.assertEqual(e.exception.args[0], "Metric 'val_loss' was NaN")
 
 
 if __name__ == "__main__":
