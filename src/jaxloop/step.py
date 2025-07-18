@@ -42,10 +42,13 @@ State = types.TrainState
 def get_zeroed_batch(spec: BatchSpec) -> Batch:
   """Returns a zeroed batch based on the input data spec."""
 
+  # Prevent treating namedtuples as potential specs.
+  is_plain_tuple = lambda x: isinstance(x, tuple) and not hasattr(x, '_fields')
+
   def is_shape(spec):
     if isinstance(spec, int):
       return True
-    return (isinstance(spec, tuple) or isinstance(spec, list)) and all(
+    return (is_plain_tuple(spec) or isinstance(spec, list)) and all(
         isinstance(i, int) for i in spec
     )
 
@@ -59,11 +62,11 @@ def get_zeroed_batch(spec: BatchSpec) -> Batch:
   def is_leaf(spec):
     if is_shape(spec):
       return True
-    if isinstance(spec, tuple) and len(spec) == 2:
+    if is_plain_tuple(spec) and len(spec) == 2:
       return is_leaf(spec[0])
     return False
 
-  return jax.tree_util.tree_map(map_fn, spec, is_leaf=is_leaf)
+  return jax.tree.map(map_fn, spec, is_leaf=is_leaf)
 
 
 @typing.runtime_checkable

@@ -14,6 +14,7 @@
 
 """Unit tests for the step library."""
 
+import collections
 import os
 from typing import Optional, Tuple
 
@@ -30,6 +31,8 @@ from orbax import checkpoint
 Batch = types.Batch
 Output = types.Output
 State = types.TrainState
+
+Point = collections.namedtuple('Point', ['x', 'y'])
 
 
 class TestModel(nn.Module):
@@ -89,16 +92,16 @@ class StepTest(absltest.TestCase):
         self.checkpoint_dir,
         checkpoint.PyTreeCheckpointer(),
     )
-    self.spec = {
-        'x': [2, 3],
-        'y': {'z': ((2, 4), jnp.float16)},
-        'a': (6, jnp.bfloat16),
-    }
+    x = jnp.ones([2, 3])
     self.batch = {
-        'x': jnp.ones([2, 3]),
+        'x': x,
         'y': {'z': jnp.ones([2, 4], dtype=jnp.float16)},
         'a': jnp.ones(6, dtype=jnp.bfloat16),
+        # Unused in the test model but checks that we can handle namedtuples in
+        # batches.
+        'p': Point(x=x, y=x),
     }
+    self.spec = jax.tree.map(lambda x: (x.shape, x.dtype), self.batch)
 
   def test_initialize_model(self):
     state = self.step.initialize_model(self.spec)
