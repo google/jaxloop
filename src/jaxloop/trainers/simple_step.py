@@ -178,8 +178,8 @@ class SimpleStep(step.Step):
   def _predict_and_compute_loss(
       self,
       state: types.TrainState,
-      input_features: jax.Array,
-      output_features: jax.Array,
+      input_features: jaxtyping.PyTree,
+      output_features: jaxtyping.PyTree,
   ):
     """Apply the model and compute MSE loss, applying gradients if training.
 
