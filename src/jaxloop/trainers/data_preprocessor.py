@@ -78,7 +78,7 @@ class DataPreprocessorBuilder:
 
   def __init__(self):
     """Initializes the builder."""
-    self._stages = list[Callable[[Any], Any]] = []
+    self._stages: list[Callable[[Any], Any]] = []
 
   def add_stage(self, stage: Callable[[Any], Any]) -> "DataPreprocessorBuilder":
     """Adds a data transformation stage to the pipeline.
