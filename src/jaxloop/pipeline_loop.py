@@ -23,7 +23,7 @@ from jaxloop import stat_loop
 from jaxloop import step as step_lib
 from jaxloop import types
 from ml_metrics import aggregates
-from ml_metrics import pipeline as pipeline_lib
+from ml_metrics import chainable as pipeline_lib
 
 # pylint: disable=logging-fstring-interpolation
 
