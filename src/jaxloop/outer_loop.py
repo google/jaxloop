@@ -392,7 +392,10 @@ class OuterLoop:
           elif spec.should_eval_fn is not None and not spec.should_eval_fn(
               EvalContext(
                   is_continuous_eval=False,
-                  step_num=self._train_loop.loop_count * train_loop_steps,
+                  step_num=min(
+                      self._train_loop.loop_count * train_loop_steps,
+                      train_total_steps,
+                  ),
                   loop_count=self._train_loop.loop_count,
               )
           ):
