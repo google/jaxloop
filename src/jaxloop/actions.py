@@ -177,23 +177,20 @@ class CheckpointAction(Action):
   def __init__(self, ckpt_manager: ocp.CheckpointManager, interval: int = 1):
     super().__init__(interval=interval)
     self._ckpt_manager = ckpt_manager
-    self._data_transfer_fn = jax.device_get
+    # TODO(varunsng): Due to downstream waymo dependencies, we need to keep
+    # this function as a class attribute. Remove this once the dependencies are
+    # removed.
+    self._data_transfer_fn = lambda x: x
 
   @property
   def ckpt_manager(self) -> ocp.CheckpointManager:
     return self._ckpt_manager
 
-  def set_data_transfer_fn(self, data_transfer_fn: Callable[[Any], Any]):
-    self._data_transfer_fn = data_transfer_fn
-
   def save(self, step: int, state: State, outputs: Optional[Output]) -> bool:
-    # Move `train_state` and `metrics` to host before doing async checkpointing.
-    # This saves HBM usage during checkpointing.
-    # Otherwise, async checkpointing will fail when jax.jit output is donated.
     return self._ckpt_manager.save(
         step,
-        metrics=self._data_transfer_fn(outputs),
-        args=ocp.args.PyTreeSave(self._data_transfer_fn(state)),
+        metrics=outputs,
+        args=ocp.args.PyTreeSave(state),
     )
 
   def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:
