@@ -436,7 +436,7 @@ class Step(Protocol):
     )
     return self.num_params
 
-  def compute_num_flops(self, state: State, batch: Batch) -> int:
+  def compute_num_flops(self, state: State, batch: Batch) -> float:
     """Computes the number of flops in the jitted `run` function.
 
     Args:
@@ -464,7 +464,7 @@ class Step(Protocol):
     return self._num_params
 
   @property
-  def num_flops(self) -> int | None:
+  def num_flops(self) -> float | None:
     return self._num_flops
 
   def _latest_step(
