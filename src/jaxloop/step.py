@@ -22,6 +22,7 @@ from etils import epath
 from flax import linen as nn
 from flax import nnx
 import jax
+from jax.experimental import roofline
 import jax.numpy as jnp
 from jaxloop import actions
 from jaxloop import partition
@@ -450,9 +451,9 @@ class Step(Protocol):
       self.compile()
 
     assert self._cached_run is not None  # Make Pytype happy.
-    analysis = self._cached_run.lower(state, batch).cost_analysis()
+    _, result = roofline.roofline(self._cached_run)(state, batch)
 
-    self._num_flops = analysis.get('flops', 0)
+    self._num_flops = float(result.unfused_flops)
     return self.num_flops
 
   @property
