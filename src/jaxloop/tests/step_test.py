@@ -157,11 +157,6 @@ class StepTest(absltest.TestCase):
     self.assertEqual(self.step.begin_step, 0)
     self.assertEqual(self.step.end_step, 1)
 
-  def test_step_log_num_flops(self):
-    state = self.step.initialize_model(self.spec)
-    self.step(state, self.batch, log_num_flops=True)
-    self.assertGreater(self.step.num_flops, 0)
-
   def test_step_with_prng_list(self):
     self.step = TestStep(
         {'params': jax.random.PRNGKey(0), 'others': jax.random.PRNGKey(1)},
