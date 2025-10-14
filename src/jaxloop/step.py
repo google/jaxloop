@@ -399,6 +399,9 @@ class Step(Protocol):
       log_num_flops: Whether to log the number of flops of the jitted `run`
         function.
       **kwargs: Additional keyword arguments for running the step.
+        batch_preprocessed (optional args in kwargs): whether the batch was
+        already preprocessed. If True, the batch will not be preprocessed again
+        (e.g. could be done as a performance optimization)
 
     Returns:
       A tuple of the model state and output.
@@ -406,7 +409,8 @@ class Step(Protocol):
     if self._cached_run is None:
       self.compile()
 
-    batch = self.preprocess_batch(batch)
+    if not kwargs.get('batch_preprocessed', False):
+      batch = self.preprocess_batch(batch)
     if self._should_shard_batch:
       batch = self.shard_batch(batch)
     self._run_begin_actions(state, per_loop_step_number)
