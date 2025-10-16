@@ -471,6 +471,10 @@ class Step(Protocol):
   def num_flops(self) -> float | None:
     return self._num_flops
 
+  @property
+  def model(self) -> nn.Module:
+    return self._model
+
   def _latest_step(
       self,
       checkpoint_dir: epath.PathLike,
