@@ -26,6 +26,7 @@ import jax.numpy as jnp
 from jaxloop import actions
 from jaxloop import partition
 from jaxloop import types
+import numpy as np
 import optax
 import orbax.checkpoint as ocp
 from orbax.checkpoint import checkpoint_utils
@@ -57,7 +58,7 @@ def get_zeroed_batch(spec: BatchSpec) -> Batch:
       shape, dtype = elem, jnp.float32
     else:
       shape, dtype = elem
-    return jnp.zeros(shape, dtype=dtype)
+    return np.zeros(shape, dtype=dtype)
 
   def is_leaf(spec):
     if is_shape(spec):
