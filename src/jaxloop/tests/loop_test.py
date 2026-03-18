@@ -14,7 +14,7 @@
 
 """Unit tests for the loop library."""
 
-from typing import Any, Iterator, Optional, Tuple
+from typing import Any, Iterator, Optional, Tuple, override
 
 from absl.testing import absltest
 import flax.linen as nn
@@ -50,15 +50,33 @@ class TestLoop(loop.Loop):
 
   def __init__(self, step: Step):
     self.begin_step = None
+    self.num_batches = 0
+    self.num_steps = 0
     self.end_step = None
     super().__init__(step)
 
+  @override
   def begin(
       self, state: State, dataset: Iterator[Any]
   ) -> Tuple[State, Iterator[Any]]:
     self.begin_step = state.step
     return super().begin(state, dataset)
 
+  @override
+  def _get_next_batch(self, dataset: Iterator[Any]) -> Any:
+    next_batch = super()._get_next_batch(dataset)
+    # Avoid incrementing after StopIteration.
+    self.num_batches += 1
+    return next_batch
+
+  @override
+  def _run_one_step(self, *args, **kwargs) -> Tuple[State, Output]:
+    state, outputs = super()._run_one_step(*args, **kwargs)
+    # Avoid incrementing after StopIteration.
+    self.num_steps += 1
+    return state, outputs
+
+  @override
   def end(
       self, state: State, outputs: Optional[Output]
   ) -> Tuple[State, Optional[Output]]:
@@ -82,6 +100,8 @@ class LoopTest(absltest.TestCase):
     state = self.step.initialize_model(self.shape)
     state, outputs = self.loop(state, self.dataset)
     self.assertEqual(self.loop.begin_step, 0)
+    self.assertEqual(self.loop.num_batches, 10)
+    self.assertEqual(self.loop.num_steps, 10)
     self.assertEqual(self.loop.end_step, 10)
     self.assertEqual(state.step, 10)
     self.assertEqual(outputs['step'], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
@@ -90,6 +110,8 @@ class LoopTest(absltest.TestCase):
     state = self.step.initialize_model(self.shape)
     state, outputs = self.loop(state, self.dataset, num_steps=5)
     self.assertEqual(self.loop.begin_step, 0)
+    self.assertEqual(self.loop.num_batches, 5)
+    self.assertEqual(self.loop.num_steps, 5)
     self.assertEqual(self.loop.end_step, 5)
     self.assertEqual(state.step, 5)
     self.assertEqual(outputs['step'], [0, 1, 2, 3, 4])
@@ -99,9 +121,23 @@ class LoopTest(absltest.TestCase):
     state = state.replace(step=5)
     state, outputs = self.loop(state, self.dataset, num_steps=5)
     self.assertEqual(self.loop.begin_step, 5)
+    self.assertEqual(self.loop.num_batches, 5)
+    self.assertEqual(self.loop.num_steps, 5)
     self.assertEqual(self.loop.end_step, 10)
     self.assertEqual(state.step, 10)
     self.assertEqual(outputs['step'], [5, 6, 7, 8, 9])
+
+  def test_no_return_state_from_step(self):
+    state = self.step.initialize_model(self.shape)
+    new_state, outputs = self.loop(
+        state, self.dataset, return_state_from_step=False
+    )
+    self.assertEqual(new_state, state)
+    self.assertEqual(self.loop.begin_step, 0)
+    self.assertEqual(self.loop.num_batches, 10)
+    self.assertEqual(self.loop.num_steps, 10)
+    self.assertEqual(self.loop.end_step, 0)
+    self.assertEqual(outputs['step'], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
   def test_model_args_validation(self):
     self.assertRaises(
@@ -113,14 +149,6 @@ class LoopTest(absltest.TestCase):
             nnx_model_args=(1, 10),
         ),
     )
-
-  def test_loop_dataset(self):
-    state = self.step.initialize_model(self.shape)
-    output_state, outputs = self.loop(
-        state, self.dataset, return_state_from_step=False
-    )
-    self.assertEqual(output_state, state)
-    self.assertEqual(outputs['step'], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
 
 if __name__ == '__main__':

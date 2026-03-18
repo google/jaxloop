@@ -15,7 +15,8 @@
 """The loop library for JAX models."""
 
 import collections
-from typing import Any, Iterator, Optional, Tuple
+from collections.abc import Iterator
+from typing import Any, Optional, Tuple
 
 from jaxloop import step as step_lib
 from jaxloop import types
@@ -71,6 +72,63 @@ class Loop:
         loop_outputs[key].append(value)
     return loop_outputs
 
+  def _get_next_batch(self, dataset: Iterator[Any]) -> Any:
+    """Returns the next batch from the dataset.
+
+    This method could can be overridden or decorated in a child class,
+    allowing to time or profile a single data batch retrieval separately.
+
+    Args:
+      dataset: The dataset iterator.
+
+    Returns:
+      The next batch from the iterator.
+    """
+    return next(dataset)
+
+  def _run_one_step(
+      self,
+      state: State,
+      dataset: Iterator[Any],
+      loop_outputs: Output,
+      per_loop_step_number: int,
+      log_num_flops: bool = False,
+      return_state_from_step: bool = True,
+      **kwargs
+  ) -> Tuple[State, Output]:
+    """Runs a single step of the loop.
+
+    This method could can be overridden or decorated in a child class,
+    allowing to time or profile a single step execution separately.
+
+    Args:
+      state: The model state.
+      dataset: The dataset iterator.
+      loop_outputs: The output of the loop.
+      per_loop_step_number: The step number of the loop.
+      log_num_flops: Whether to log the number of flops of the step function.
+      return_state_from_step: If true, return state object will be returned from
+        step with each batch. Sometimes this needs to be disabled for supporting
+        returning empty state from step to free up memory during eval loop as
+        eval loop doesn't update model weights and optimizer state.
+      **kwargs: Additional keyword arguments for step function.
+
+    Returns:
+      A tuple of the model state and output.
+    """
+    batch = self._get_next_batch(dataset)
+    step_state, step_outputs = self._step(
+        state,
+        batch,
+        per_loop_step_number,
+        log_num_flops=log_num_flops,
+        **kwargs
+    )
+    if return_state_from_step:
+      state = step_state
+    loop_outputs = self.update_outputs(loop_outputs, step_outputs)
+    return state, loop_outputs
+
   def run(
       self,
       state: State,
@@ -95,31 +153,22 @@ class Loop:
     """
     per_loop_step_number = 0
     loop_outputs = collections.defaultdict(list)
-    # return_state_from_step: If true, return state object will be returned from
-    #   step with each batch. Sometimes this needs to be disabled for supporting
-    #   returning empty state from step to free up memory during eval loop as
-    #   eval loop doesn't update model weights and optimizer state.
     return_state_from_step = kwargs.pop('return_state_from_step', True)
-    for batch in dataset:
+    while True:
       log_num_flops = log_num_flops and per_loop_step_number == 0
       per_loop_step_number += 1
-      if return_state_from_step:
-        state, step_outputs = self._step(
-            state,
-            batch,
-            per_loop_step_number,
+      try:
+        state, loop_outputs = self._run_one_step(
+            state=state,
+            dataset=dataset,
+            loop_outputs=loop_outputs,
+            per_loop_step_number=per_loop_step_number,
             log_num_flops=log_num_flops,
+            return_state_from_step=return_state_from_step,
             **kwargs
         )
-      else:
-        _, step_outputs = self._step(
-            state,
-            batch,
-            per_loop_step_number,
-            log_num_flops=log_num_flops,
-            **kwargs
-        )
-      loop_outputs = self.update_outputs(loop_outputs, step_outputs)
+      except StopIteration:
+        break
       if num_steps is not None and per_loop_step_number >= num_steps:
         break
     return state, loop_outputs
