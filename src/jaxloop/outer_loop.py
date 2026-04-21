@@ -87,7 +87,15 @@ class EvalSpec:
   run the eval loop. There is a one to one match for eval loop and eval spec.
 
   Attributes:
-    dataset: The dataset used in the eval loop.
+    dataset: The dataset used in the eval loop. Ignored if dataset_iterator is
+      provided.
+    dataset_iterator: The dataset iterator used in the eval loop. If provided,
+      the eval loop will use this iterator instead of creating one from dataset.
+      This can be useful to avoid re-building the dataset iterator each time the
+      eval loop is run if the iterator is pre-defined to repeat `num_steps`
+      examples. Note this also means iterator state is held throughout the outer
+      loop's execution, which can increase RAM usage when there are several
+      eval loops.
     num_steps: The number of steps to run in the eval loop. If None, the eval
       loop will run to the end of the dataset.
     eval_loop_interval: The loop interval to trigger the eval loop. If None, the
@@ -102,6 +110,7 @@ class EvalSpec:
   """
 
   dataset: Iterable[Any]
+  dataset_iterator: Optional[Iterator[Any]] = None
   num_steps: Optional[int] = None
   eval_loop_interval: Optional[int] = None
   should_eval_fn: Optional[ShouldEvalFn] = None
@@ -109,12 +118,14 @@ class EvalSpec:
   def __init__(
       self,
       dataset: Iterable[Any],
+      dataset_iterator: Optional[Iterator[Any]] = None,
       num_steps: Optional[int] = None,
       eval_loop_interval: Optional[int] = None,
       should_eval_fn: Optional[ShouldEvalFn] = None,
       **_: dict[str, Any],
   ):
     self.dataset = dataset
+    self.dataset_iterator = dataset_iterator
     self.num_steps = num_steps
     self.eval_loop_interval = eval_loop_interval
     self.should_eval_fn = should_eval_fn
@@ -296,7 +307,9 @@ class OuterLoop:
             eval_loop.step, state, step_num=step_num
         )
         eval_state, outputs = eval_loop(
-            eval_state, iter(spec.dataset), spec.num_steps
+            eval_state,
+            spec.dataset_iterator or iter(spec.dataset),
+            spec.num_steps,
         )
     return eval_state, outputs
 
@@ -402,7 +415,7 @@ class OuterLoop:
             continue
 
           state, eval_outputs = eval_loop(
-              state, iter(spec.dataset), spec.num_steps
+              state, spec.dataset_iterator or iter(spec.dataset), spec.num_steps
           )
           stop_loop = stop_loop or self._get_stop_loop(eval_outputs)
 
