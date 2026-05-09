@@ -47,6 +47,10 @@ class ActionLoop(stat_loop.StatLoop):
     self._end_actions = end_actions
     self._loop_count = 0
 
+  def _should_run_action(self, action: Action) -> bool:
+    """Returns whether the action should be run."""
+    return self._loop_count % action.interval == 0
+
   def begin(
       self, state: State, dataset: Iterator[Any]
   ) -> Tuple[State, Iterator[Any]]:
@@ -62,7 +66,7 @@ class ActionLoop(stat_loop.StatLoop):
     self._loop_count += 1
     if self._begin_actions is not None:
       for action in self._begin_actions:
-        if self._loop_count % action.interval == 0:
+        if self._should_run_action(action):
           action(state, None)
     return super().begin(state, dataset)
 
@@ -82,7 +86,7 @@ class ActionLoop(stat_loop.StatLoop):
     jax.block_until_ready((state, outputs))
     if self._end_actions is not None:
       for action in self._end_actions:
-        if self._loop_count % action.interval == 0:
+        if self._should_run_action(action):
           action(state, outputs)
     return state, outputs
 
