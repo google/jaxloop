@@ -42,7 +42,7 @@ class TestModel(nn.Module):
 
 class TestStep(Step):
 
-  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
     return state.replace(step=state.step + 1), None
 
 
@@ -67,7 +67,7 @@ class StatLoopTest(absltest.TestCase):
   def test_stat_loop(self):
     state = self.step.initialize_model(self.shape)
     _, outputs = self.loop(state, self.dataset)
-    self.assertTrue(all(name in outputs for name in self.stat_names))
+    self.assertTrue(all(name in outputs for name in self.stat_names))  # pyrefly: ignore[not-iterable]
 
 
 if __name__ == '__main__':

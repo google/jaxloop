@@ -128,7 +128,7 @@ class DataParallelPartitioner(SingleDevicePartitioner):
     return jax.jit(
         init_fn,
         out_shardings=sharding.NamedSharding(
-            self._mesh, sharding.PartitionSpec()
+            self._mesh, sharding.PartitionSpec()  # pyrefly: ignore[bad-argument-type]
         ),
     )
 
@@ -143,7 +143,7 @@ class DataParallelPartitioner(SingleDevicePartitioner):
         in_shardings=(
             self._sharding,  # state
             sharding.NamedSharding(
-                self._mesh, sharding.PartitionSpec(self._data_axis)
+                self._mesh, sharding.PartitionSpec(self._data_axis)  # pyrefly: ignore[bad-argument-type]
             ),  # data
         ),
         donate_argnames='state',
@@ -184,7 +184,7 @@ class SPMDPartitioner(SingleDevicePartitioner):
       state = state.replace(step=jnp.array(state.step))
       partition_specs = nn.get_partition_spec(state)
       self._sharding = jax.tree.map(
-          lambda x: sharding.NamedSharding(self._mesh, x), partition_specs
+          lambda x: sharding.NamedSharding(self._mesh, x), partition_specs  # pyrefly: ignore[bad-argument-type]
       )
       return lax.with_sharding_constraint(state, self._sharding)
 
@@ -201,7 +201,7 @@ class SPMDPartitioner(SingleDevicePartitioner):
         in_shardings=(
             self._sharding,  # state
             sharding.NamedSharding(
-                self._mesh, sharding.PartitionSpec(self._data_axis)
+                self._mesh, sharding.PartitionSpec(self._data_axis)  # pyrefly: ignore[bad-argument-type]
             ),  # data
         ),
         donate_argnames='state',

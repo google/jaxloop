@@ -94,7 +94,7 @@ class ResnetTrainLoop(train_loop_lib.TrainLoop):
   def end(
       self, state: types.TrainState, outputs: Optional[types.Output]
   ) -> tuple[types.TrainState, Optional[types.Output]]:
-    return super().end(state, compute_metrics(outputs))
+    return super().end(state, compute_metrics(outputs))  # pyrefly: ignore[bad-argument-type]
 
 
 class ResnetEvalLoop(eval_loop_lib.EvalLoop):
@@ -103,7 +103,7 @@ class ResnetEvalLoop(eval_loop_lib.EvalLoop):
   def end(
       self, state: types.TrainState, outputs: Optional[types.Output]
   ) -> tuple[types.TrainState, Optional[types.Output]]:
-    return super().end(state, compute_metrics(outputs))
+    return super().end(state, compute_metrics(outputs))  # pyrefly: ignore[bad-argument-type]
 
 
 def _get_data(
@@ -209,10 +209,10 @@ def main(_: Sequence[str]) -> None:
   eval_loops = [ResnetEvalLoop(eval_step, end_actions=[eval_summary_action])]
 
   outer_loop = outer_loop_lib.OuterLoop(
-      train_loop=train_loop, eval_loops=eval_loops
+      train_loop=train_loop, eval_loops=eval_loops  # pyrefly: ignore[bad-argument-type]
   )
   outer_loop(
-      state=train_step.initialize_model((global_batch_size, *_IMAGE_SHAPE)),
+      state=train_step.initialize_model((global_batch_size, *_IMAGE_SHAPE)),  # pyrefly: ignore[bad-argument-type]
       train_dataset=ds_train,
       train_total_steps=train_steps,
       train_loop_steps=_TRAIN_LOOP_STEPS,

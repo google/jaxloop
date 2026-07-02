@@ -293,7 +293,7 @@ class OuterLoop:
     eval_state = state
     outputs = None
     for step_num in self._get_eval_checkpoint_iterator():
-      for eval_loop, spec in zip(self._eval_loops, eval_specs):
+      for eval_loop, spec in zip(self._eval_loops, eval_specs):  # pyrefly: ignore[bad-argument-type]
         if spec.should_eval_fn is not None and not spec.should_eval_fn(
             EvalContext(
                 is_continuous_eval=True,
@@ -380,9 +380,9 @@ class OuterLoop:
 
     outputs = None
     stop_loop = False
-    while step < train_total_steps and not stop_loop:
-      num_steps = min(num_steps, train_total_steps - step)
-      state, new_outputs = self._train_loop(state, train_dataset, num_steps)
+    while step < train_total_steps and not stop_loop:  # pyrefly: ignore[unsupported-operation]
+      num_steps = min(num_steps, train_total_steps - step)  # pyrefly: ignore[bad-specialization, unsupported-operation]
+      state, new_outputs = self._train_loop(state, train_dataset, num_steps)  # pyrefly: ignore[bad-argument-type]
       num_steps = train_loop_steps
       if step == int(state.step):
         logging.warning(
@@ -405,8 +405,8 @@ class OuterLoop:
           elif spec.should_eval_fn is not None and not spec.should_eval_fn(
               EvalContext(
                   is_continuous_eval=False,
-                  step_num=min(
-                      self._train_loop.loop_count * train_loop_steps,
+                  step_num=min(  # pyrefly: ignore[bad-argument-type, bad-specialization]
+                      self._train_loop.loop_count * train_loop_steps,  # pyrefly: ignore[unsupported-operation]
                       train_total_steps,
                   ),
                   loop_count=self._train_loop.loop_count,

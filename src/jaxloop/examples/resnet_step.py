@@ -75,7 +75,7 @@ def _resnet_eval_loss_and_logits(
 class ResnetStep(step_lib.Step):
   """A single step for Resnet."""
 
-  def run(
+  def run(  # pyrefly: ignore[bad-override]
       self, state: types.TrainState, batch: types.Batch
   ) -> tuple[types.TrainState, Optional[types.Output]]:
     """A single step for Resnet."""
@@ -84,14 +84,14 @@ class ResnetStep(step_lib.Step):
     # Get loss and logits.
     if self._train:
       state, loss, logits = _resnet_training_loss_and_logits(
-          state, images, labels, self.prng_key(state.step)
+          state, images, labels, self.prng_key(state.step)  # pyrefly: ignore[bad-argument-type]
       )
     else:
-      state, loss, logits = _resnet_eval_loss_and_logits(state, images, labels)
+      state, loss, logits = _resnet_eval_loss_and_logits(state, images, labels)  # pyrefly: ignore[bad-argument-type]
 
     loss = clu_metrics.Average.from_model_output(values=loss)
     accuracy = clu_metrics.Accuracy.from_model_output(
-        logits=logits, labels=labels
+        logits=logits, labels=labels  # pyrefly: ignore[bad-argument-type]
     )
 
     return state, {'loss': loss, 'accuracy': accuracy}

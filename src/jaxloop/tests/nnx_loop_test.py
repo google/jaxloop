@@ -44,7 +44,7 @@ class TestModel(nnx.Module):
 
 class TestStep(Step):
 
-  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
     return state.replace(step=state.step + 1), {'step': state.step}
 
 
@@ -88,7 +88,7 @@ class LoopTest(absltest.TestCase):
     self.assertEqual(self.loop.begin_step, 0)
     self.assertEqual(self.loop.end_step, 10)
     self.assertEqual(state.step, 10)
-    self.assertEqual(outputs['step'], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    self.assertEqual(outputs['step'], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])  # pyrefly: ignore[unsupported-operation]
 
   def test_loop_num_steps(self):
     state = self.step.initialize_model(self.shape)
@@ -96,7 +96,7 @@ class LoopTest(absltest.TestCase):
     self.assertEqual(self.loop.begin_step, 0)
     self.assertEqual(self.loop.end_step, 5)
     self.assertEqual(state.step, 5)
-    self.assertEqual(outputs['step'], [0, 1, 2, 3, 4])
+    self.assertEqual(outputs['step'], [0, 1, 2, 3, 4])  # pyrefly: ignore[unsupported-operation]
 
   def test_loop_continue_num_steps(self):
     state = self.step.initialize_model(self.shape)
@@ -105,7 +105,7 @@ class LoopTest(absltest.TestCase):
     self.assertEqual(self.loop.begin_step, 5)
     self.assertEqual(self.loop.end_step, 10)
     self.assertEqual(state.step, 10)
-    self.assertEqual(outputs['step'], [5, 6, 7, 8, 9])
+    self.assertEqual(outputs['step'], [5, 6, 7, 8, 9])  # pyrefly: ignore[unsupported-operation]
 
   def test_model_args_validation(self):
     self.assertRaises(

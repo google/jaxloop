@@ -44,7 +44,7 @@ class TestModel(nn.Module):
 
 class TestStep(Step):
 
-  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
     return state, {'step': 1}
 
 
@@ -60,7 +60,7 @@ class PipelineLoopTest(parameterized.TestCase):
         test_step,
     )
     _, result = loop(state, dataset)
-    self.assertEqual(result['step'], [1] * 10)
+    self.assertEqual(result['step'], [1] * 10)  # pyrefly: ignore[unsupported-operation]
 
 
 if __name__ == '__main__':

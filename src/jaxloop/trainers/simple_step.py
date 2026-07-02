@@ -92,7 +92,7 @@ class SimpleStep(step.Step):
       logging.info("Initialized model with %d parameters.", self.num_params)
     return state
 
-  def run(
+  def run(  # pyrefly: ignore[bad-override]
       self, state: step.State, batch: step.Batch
   ) -> Tuple[step.State, step.Output]:
     """Train on a batch of data."""
@@ -129,7 +129,7 @@ class SimpleStep(step.Step):
     if isinstance(batch, types.Array):
       return batch
 
-    return batch["input_features"]
+    return batch["input_features"]  # pyrefly: ignore[bad-index]
 
   def _update_input_features(
       self, batch: step.Batch, updated_input_features: types.Array

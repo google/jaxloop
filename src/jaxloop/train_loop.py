@@ -62,9 +62,9 @@ class TrainLoop(action_loop.ActionLoop):
       A tuple of the model state and output.
     """
     state, outputs = super().end(state, outputs)
-    if stat_loop.STAT_STEPS_PER_SEC in outputs:
+    if stat_loop.STAT_STEPS_PER_SEC in outputs:  # pyrefly: ignore[not-iterable]
       step = int(state.step)
-      steps_per_sec = outputs[stat_loop.STAT_STEPS_PER_SEC]
+      steps_per_sec = outputs[stat_loop.STAT_STEPS_PER_SEC]  # pyrefly: ignore[unsupported-operation]
       logging.info(
           f'train    | step: {step: 6d} | steps_per_sec: {steps_per_sec: 6.1f}'
       )

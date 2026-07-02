@@ -71,14 +71,14 @@ class StepTest(absltest.TestCase):
     }
 
   def test_initialize_model(self):
-    state = self.step.initialize_model(self.spec)
+    state = self.step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 0)
     self.assertIn('Dense_0', state.params)
     self.assertIn('Dense_1', state.params)
     self.assertIn('Dense_2', state.params)
 
   def test_restore_model(self):
-    state = self.step.initialize_model(self.spec)
+    state = self.step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
     self.checkpoint_manager.save(0, args=checkpoint.args.PyTreeSave(state))
     self.checkpoint_manager.wait_until_finished()
     state = self.step.restore_model(state, self.checkpoint_dir)
@@ -88,25 +88,25 @@ class StepTest(absltest.TestCase):
     self.assertIn('Dense_2', state.params)
 
   def test_restore_model_no_latest_step(self):
-    state = self.step.initialize_model(self.spec)
+    state = self.step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
     with self.assertLogs(level='INFO') as cm:
       restored_state = self.step.restore_model(state, self.checkpoint_dir)
       self.assertEqual(state, restored_state)
     self.assertRegex(cm.output[0], r'No checkpoint found in.*')
 
   def test_compile(self):
-    state = self.step.initialize_model(self.spec)
+    state = self.step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 0)
 
     self.step.compile()
     self.assertEqual(state.step, 0)
 
-    state, _ = self.step(state, self.batch)
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
 
     # `keep_unused` is a valid `jax.jit` compile flag.
     self.step.compile(keep_unused=True)
-    state, _ = self.step(state, self.batch)
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 2)
 
     # An invalid `jax.jit` compile flag will result in an error.
@@ -122,26 +122,26 @@ class StepTest(absltest.TestCase):
         self.model,
         optimizer=optax.adam(1e-4),
     )
-    state = self.step.initialize_model(self.spec)
-    state, _ = self.step(state, self.batch)
+    state = self.step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
 
   def test_step(self):
-    state = self.step.initialize_model(self.spec)
-    state, output = self.step(state, self.batch)
+    state = self.step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
+    state, output = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
-    self.assertIn('loss', output)
-    self.assertIn('output_features_pred', output)
+    self.assertIn('loss', output)  # pyrefly: ignore[bad-argument-type]
+    self.assertIn('output_features_pred', output)  # pyrefly: ignore[bad-argument-type]
 
-    loss_1 = output['loss']
+    loss_1 = output['loss']  # pyrefly: ignore[unsupported-operation]
 
     for i in range(3):
-      state, output = self.step(state, self.batch)
+      state, output = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
       self.assertEqual(state.step, 2 + i)
-      self.assertIn('loss', output)
-      self.assertIn('output_features_pred', output)
+      self.assertIn('loss', output)  # pyrefly: ignore[bad-argument-type]
+      self.assertIn('output_features_pred', output)  # pyrefly: ignore[bad-argument-type]
 
-    self.assertLess(output['loss'].total.item(), loss_1.total.item())
+    self.assertLess(output['loss'].total.item(), loss_1.total.item())  # pyrefly: ignore[unsupported-operation]
 
   def test_step_with_dropout(self):
     model = TestModel(with_dropout=True)
@@ -151,21 +151,21 @@ class StepTest(absltest.TestCase):
         optimizer=optax.adam(1e-4),
         train=True,
     )
-    state = step.initialize_model(self.spec)
-    state, output = step(state, self.batch)
+    state = step.initialize_model(self.spec)  # pyrefly: ignore[bad-argument-type]
+    state, output = step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
-    self.assertIn('loss', output)
-    self.assertIn('output_features_pred', output)
+    self.assertIn('loss', output)  # pyrefly: ignore[bad-argument-type]
+    self.assertIn('output_features_pred', output)  # pyrefly: ignore[bad-argument-type]
 
-    loss_1 = output['loss']
+    loss_1 = output['loss']  # pyrefly: ignore[unsupported-operation]
 
     for i in range(3):
-      state, output = step(state, self.batch)
+      state, output = step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
       self.assertEqual(state.step, 2 + i)
-      self.assertIn('loss', output)
-      self.assertIn('output_features_pred', output)
+      self.assertIn('loss', output)  # pyrefly: ignore[bad-argument-type]
+      self.assertIn('output_features_pred', output)  # pyrefly: ignore[bad-argument-type]
 
-    self.assertLess(output['loss'].total.item(), loss_1.total.item())
+    self.assertLess(output['loss'].total.item(), loss_1.total.item())  # pyrefly: ignore[unsupported-operation]
 
 
 if __name__ == '__main__':

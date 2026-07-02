@@ -78,8 +78,8 @@ class SimpleDataLoader(TrainerDataLoader):
     self._dataset = dataset
     self._validate_batches = validate_batches
 
-    self._batch_spec: step.BatchSpec = None
-    self._first_batch: step.Batch = None
+    self._batch_spec: step.BatchSpec = None  # pyrefly: ignore[bad-assignment]
+    self._first_batch: step.Batch = None  # pyrefly: ignore[bad-assignment]
 
   def __iter__(self):
     """Returns the iterator object."""
@@ -93,7 +93,7 @@ class SimpleDataLoader(TrainerDataLoader):
     """
     if self._first_batch is not None:
       batch = self._first_batch
-      self._first_batch = None
+      self._first_batch = None  # pyrefly: ignore[bad-assignment]
       return batch
 
     batch = next(self._dataset)

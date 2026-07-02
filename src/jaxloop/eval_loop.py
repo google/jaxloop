@@ -57,7 +57,7 @@ class EvalLoop(action_loop.ActionLoop):
           f'eval     | step: {step: 6d} | running {num_steps} eval steps.'
       )
 
-  def run(
+  def run(  # pyrefly: ignore[bad-override]
       self,
       state: State,
       dataset: Iterator[Any],
@@ -93,9 +93,9 @@ class EvalLoop(action_loop.ActionLoop):
       A tuple of the model state and output.
     """
     state, outputs = super().end(state, outputs)
-    if stat_loop.STAT_LOOP_TIME_SECS in outputs:
+    if stat_loop.STAT_LOOP_TIME_SECS in outputs:  # pyrefly: ignore[not-iterable]
       step = int(state.step)
-      eval_time = outputs[stat_loop.STAT_LOOP_TIME_SECS]
+      eval_time = outputs[stat_loop.STAT_LOOP_TIME_SECS]  # pyrefly: ignore[unsupported-operation]
       logging.info(
           f'eval     | step: {step: 6d} | eval time: {eval_time: 4.2f} seconds.'
       )

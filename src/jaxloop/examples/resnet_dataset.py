@@ -59,7 +59,7 @@ def imagenet_datasets(
   train_len = ds_builder.info.splits['train'].num_examples // batch_size
   ds_train = (
       ds_builder.as_dataset(
-          split=tfds.Split.TRAIN,
+          split=tfds.Split.TRAIN,  # pyrefly: ignore[missing-attribute]
           shuffle_files=True,
           decoders={'image': tfds.decode.SkipDecoding()},
       )
@@ -74,7 +74,7 @@ def imagenet_datasets(
   )
   ds_val = (
       ds_builder.as_dataset(
-          split=tfds.Split.VALIDATION,
+          split=tfds.Split.VALIDATION,  # pyrefly: ignore[missing-attribute]
           decoders={'image': tfds.decode.SkipDecoding()},
       )
       .map(

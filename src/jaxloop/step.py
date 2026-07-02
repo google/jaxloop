@@ -133,7 +133,7 @@ class Step(Protocol):
       Checkpointer for more details.
   """
 
-  _STATE_KEYS = ('step', 'params', 'batch_stats')
+  _STATE_KEYS = ('step', 'params', 'batch_stats')  # pyrefly: ignore[unannotated-protocol-member]
 
   def __init__(
       self,
@@ -155,7 +155,7 @@ class Step(Protocol):
     self._model = (
         model
         if isinstance(model, nn.Module)
-        else nnx.bridge.ToLinen(model, nnx_model_args, kwargs=nnx_model_kwargs)
+        else nnx.bridge.ToLinen(model, nnx_model_args, kwargs=nnx_model_kwargs)  # pyrefly: ignore[bad-argument-type]
     )
     self._optimizer = optimizer
     self._partitioner = partitioner
@@ -421,7 +421,7 @@ class Step(Protocol):
       self.compute_num_flops(state, batch)
       logging.info(f'Step flops: {self.num_flops}')
 
-    state, outputs = self._cached_run(state, batch, **kwargs)
+    state, outputs = self._cached_run(state, batch, **kwargs)  # pyrefly: ignore[not-callable]
     state, outputs = self.end(state, outputs)
     self._run_end_actions(state, outputs, per_loop_step_number)
 
@@ -439,7 +439,7 @@ class Step(Protocol):
     self._num_params = sum(
         x.size for x in jax.tree_util.tree_leaves(state.params)
     )
-    return self.num_params
+    return self.num_params  # pyrefly: ignore[bad-return]
 
   def compute_num_flops(self, state: State, batch: Batch) -> float:
     """Computes the number of flops in the jitted `run` function.
@@ -458,7 +458,7 @@ class Step(Protocol):
     analysis = self._cached_run.lower(state, batch).compile().cost_analysis()
 
     self._num_flops = analysis.get('flops', 0)
-    return self.num_flops
+    return self.num_flops  # pyrefly: ignore[bad-return]
 
   @property
   def train(self) -> bool:

@@ -59,7 +59,7 @@ class TestStep(step.Step):
       optimizer: Optional[optax.GradientTransformation] = None,
       partitioner: partition.Partitioner = partition.SingleDevicePartitioner(),
   ):
-    super().__init__(base_prng, model, optimizer, partitioner)
+    super().__init__(base_prng, model, optimizer, partitioner)  # pyrefly: ignore[bad-argument-type]
     self.begin_step = None
     self.end_step = None
 
@@ -67,7 +67,7 @@ class TestStep(step.Step):
     self.begin_step = state.step
     return state, batch
 
-  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
     return state.replace(step=state.step + 1), None
 
   def end(
@@ -131,14 +131,14 @@ class StepTest(absltest.TestCase):
     state = self.step.initialize_model(self.spec)
 
     self.step.compile()
-    state, _ = self.step(state, self.batch)
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
     self.assertEqual(self.step.begin_step, 0)
     self.assertEqual(self.step.end_step, 1)
 
     # `keep_unused` is a valid `jax.jit` compile flag.
     self.step.compile(keep_unused=True)
-    state, _ = self.step(state, self.batch)
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 2)
     self.assertEqual(self.step.begin_step, 1)
     self.assertEqual(self.step.end_step, 2)
@@ -152,15 +152,15 @@ class StepTest(absltest.TestCase):
 
   def test_step(self):
     state = self.step.initialize_model(self.spec)
-    state, _ = self.step(state, self.batch)
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
     self.assertEqual(self.step.begin_step, 0)
     self.assertEqual(self.step.end_step, 1)
 
   def test_step_log_num_flops(self):
     state = self.step.initialize_model(self.spec)
-    self.step(state, self.batch, log_num_flops=True)
-    self.assertGreater(self.step.num_flops, 0)
+    self.step(state, self.batch, log_num_flops=True)  # pyrefly: ignore[bad-argument-type]
+    self.assertGreater(self.step.num_flops, 0)  # pyrefly: ignore[no-matching-overload]
 
   def test_step_with_prng_list(self):
     self.step = TestStep(
@@ -169,7 +169,7 @@ class StepTest(absltest.TestCase):
         optimizer=optax.adam(1e-4),
     )
     state = self.step.initialize_model(self.spec)
-    state, _ = self.step(state, self.batch)
+    state, _ = self.step(state, self.batch)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(state.step, 1)
     self.assertEqual(self.step.begin_step, 0)
     self.assertEqual(self.step.end_step, 1)

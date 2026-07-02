@@ -96,7 +96,7 @@ class MnistStep(Step):
       batch['label'] = batch['label'].numpy()
     return state, batch
 
-  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
     images, labels = batch['image'], batch['label']
 
     def loss_fn(params):
@@ -148,7 +148,7 @@ class IteratorTrainLoop(train_loop_lib.TrainLoop):
     super().__init__(step)
     self.enforced_dataset = None
 
-  def run(
+  def run(  # pyrefly: ignore[bad-override]
       self,
       state: State,
       dataset: Iterator[Any],
@@ -216,8 +216,8 @@ class MnistTest(absltest.TestCase):
         train_loop_steps=10,
     )
     self.assertEqual(state.step, 100)
-    self.assertLen(outputs['loss'], 10)
-    self.assertLen(outputs['accuracy'], 10)
+    self.assertLen(outputs['loss'], 10)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 10)  # pyrefly: ignore[unsupported-operation]
 
   def test_early_stop_from_train_loop(self):
     train_loop = EarlyStopTrainLoop(self.train_step)
@@ -229,7 +229,7 @@ class MnistTest(absltest.TestCase):
         train_loop_steps=10,
     )
     self.assertEqual(state.step, 10)
-    self.assertTrue(outputs[outer_loop_lib.STOP_LOOP])
+    self.assertTrue(outputs[outer_loop_lib.STOP_LOOP])  # pyrefly: ignore[unsupported-operation]
 
   def test_early_stop_from_eval_loop(self):
     train_loop = train_loop_lib.TrainLoop(self.train_step)
@@ -246,7 +246,7 @@ class MnistTest(absltest.TestCase):
         eval_specs=eval_specs,
     )
     self.assertEqual(state.step, 10)
-    self.assertTrue(outputs[outer_loop_lib.STOP_LOOP])
+    self.assertTrue(outputs[outer_loop_lib.STOP_LOOP])  # pyrefly: ignore[unsupported-operation]
 
   def test_train_loop_continue_from_step(self):
     train_loop = train_loop_lib.TrainLoop(self.train_step)
@@ -260,8 +260,8 @@ class MnistTest(absltest.TestCase):
     )
     self.assertEqual(state.step, 100)
     self.assertEqual(train_loop.loop_count, 10)
-    self.assertLen(outputs['loss'], 10)
-    self.assertLen(outputs['accuracy'], 10)
+    self.assertLen(outputs['loss'], 10)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 10)  # pyrefly: ignore[unsupported-operation]
 
   def test_train_loop_from_checkpoint(self):
     ckpt_writer = checkpoint.Checkpointer(checkpoint.PyTreeCheckpointHandler())
@@ -310,8 +310,8 @@ class MnistTest(absltest.TestCase):
         train_loop_steps=10,
     )
     self.assertEqual(state.step, 50)
-    self.assertIn('loss', outputs)
-    self.assertIn('accuracy', outputs)
+    self.assertIn('loss', outputs)  # pyrefly: ignore[bad-argument-type]
+    self.assertIn('accuracy', outputs)  # pyrefly: ignore[bad-argument-type]
 
   def test_eval_loop(self):
     eval_loop = eval_loop_lib.EvalLoop(self.eval_step)
@@ -321,8 +321,8 @@ class MnistTest(absltest.TestCase):
         num_steps=100,
     )
     self.assertEqual(eval_loop.loop_count, 1)
-    self.assertLen(outputs['loss'], 100)
-    self.assertLen(outputs['accuracy'], 100)
+    self.assertLen(outputs['loss'], 100)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 100)  # pyrefly: ignore[unsupported-operation]
 
   def test_train_and_eval_loop(self):
     train_loop = train_loop_lib.TrainLoop(self.train_step)
@@ -340,8 +340,8 @@ class MnistTest(absltest.TestCase):
     )
     self.assertEqual(eval_loop.loop_count, 10)
     self.assertEqual(state.step, 100)
-    self.assertLen(outputs['loss'], 10)
-    self.assertLen(outputs['accuracy'], 10)
+    self.assertLen(outputs['loss'], 10)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 10)  # pyrefly: ignore[unsupported-operation]
 
   def test_continuous_eval(self):
     checkpoints_count = 2
@@ -421,8 +421,8 @@ class MnistTest(absltest.TestCase):
     self.assertEqual(eval_loop4.loop_count, 0)
 
     self.assertEqual(state.step, 0)
-    self.assertLen(outputs['loss'], 100)
-    self.assertLen(outputs['accuracy'], 100)
+    self.assertLen(outputs['loss'], 100)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 100)  # pyrefly: ignore[unsupported-operation]
 
   def test_single_shot_eval(self):
     ckpt_writer = checkpoint.Checkpointer(checkpoint.PyTreeCheckpointHandler())
@@ -457,8 +457,8 @@ class MnistTest(absltest.TestCase):
     )
     self.assertEqual(eval_loop.loop_count, 1)
     self.assertEqual(state.step, 0)
-    self.assertLen(outputs['loss'], 100)
-    self.assertLen(outputs['accuracy'], 100)
+    self.assertLen(outputs['loss'], 100)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 100)  # pyrefly: ignore[unsupported-operation]
 
   def test_iterator_conversion(self):
     train_loop = IteratorTrainLoop(self.train_step)
@@ -613,8 +613,8 @@ class MnistTest(absltest.TestCase):
         eval_specs=eval_specs,
     )
     self.assertEqual(state.step, 100)
-    self.assertLen(outputs['loss'], 10)
-    self.assertLen(outputs['accuracy'], 10)
+    self.assertLen(outputs['loss'], 10)  # pyrefly: ignore[unsupported-operation]
+    self.assertLen(outputs['accuracy'], 10)  # pyrefly: ignore[unsupported-operation]
     self.assertEqual(all_actions[0].counter, 5)
     self.assertEqual(all_actions[1].counter, 5)
     self.assertEqual(all_actions[2].counter, 2)

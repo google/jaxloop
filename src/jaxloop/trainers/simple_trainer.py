@@ -168,9 +168,9 @@ class SimpleTrainer:
   def _setup(self, **kwargs):
     """Performs internal setup of loops."""
     self._model_state = self._train_step.initialize_model(
-        self._batch_spec, self._log_num_params, **kwargs
+        self._batch_spec, self._log_num_params, **kwargs  # pyrefly: ignore[bad-argument-type]
     )
-    self._eval_step.initialize_model(self._batch_spec, False, **kwargs)
+    self._eval_step.initialize_model(self._batch_spec, False, **kwargs)  # pyrefly: ignore[bad-argument-type]
 
   def train(
       self,

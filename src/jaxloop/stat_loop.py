@@ -131,12 +131,12 @@ class StatLoop(Loop):
       outputs[STAT_LIFE_TIME_SECS] = time.time() - self._init_time
     if (STAT_LOOP_TIME_SECS in self._stat_names or
         STAT_STEPS_PER_SEC in self._stat_names):
-      runtime_secs = time.time() - self._begin_time
+      runtime_secs = time.time() - self._begin_time  # pyrefly: ignore[unsupported-operation]
       if STAT_LOOP_TIME_SECS in self._stat_names:
         outputs[STAT_LOOP_TIME_SECS] = runtime_secs
       if STAT_STEPS_PER_SEC in self._stat_names:
         outputs[STAT_STEPS_PER_SEC] = (
-            (int(state.step) - self._begin_step) / runtime_secs
+            (int(state.step) - self._begin_step) / runtime_secs  # pyrefly: ignore[unsupported-operation]
         )
       if (
           STAT_EXAMPLES_PER_SEC in self._stat_names

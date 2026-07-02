@@ -60,7 +60,7 @@ class TransformerStep(simple_step.SimpleStep):
     Returns:
       The value associated with batch["input_features"].
     """
-    return batch["input_features"]
+    return batch["input_features"]  # pyrefly: ignore[bad-index]
 
   def _validate_input_features(self, input_features: Any) -> None:
     """Checks for required keys in input_features for TransformerStep.
@@ -103,7 +103,7 @@ class TransformerStep(simple_step.SimpleStep):
           "TransformerStep requires 'labels'."
       )
 
-  def loss_fn(
+  def loss_fn(  # pyrefly: ignore[bad-override]
       self, logits: Array, labels: Array, attention_mask: Array
   ) -> Array:
     """Computes masked softmax cross-entropy loss.
@@ -168,7 +168,7 @@ class TransformerStep(simple_step.SimpleStep):
           {"params": params},
           input_features,  # Pass the whole dict
           train=self._train,
-          rngs=self.prng_key(state.step),  # Use step-dependent PRNG key
+          rngs=self.prng_key(state.step),  # Use step-dependent PRNG key  # pyrefly: ignore[bad-argument-type]
       )
 
       labels = output_features["labels"]

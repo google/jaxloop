@@ -50,7 +50,7 @@ class FakeStepNumberWriter(step_number_writer.StepNumberWriter):
 class ActionsTest(absltest.TestCase):
 
   def test_action_interval(self):
-    action = actions.Action(interval=2)
+    action = actions.Action(interval=2)  # pyrefly: ignore[bad-instantiation]
     self.assertEqual(action.interval, 2)
 
   def test_step_number_action(self):

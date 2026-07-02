@@ -44,7 +44,7 @@ class TestModel(nn.Module):
 
 class TestStep(Step):
 
-  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
     return state.replace(step=state.step + 1), None
 
 
@@ -93,13 +93,13 @@ class ActionLoopTest(absltest.TestCase):
         jax.random.PRNGKey(0),
         self.model,
         optax.adam(1e-4),
-        begin_actions=self.begin_step_actions,
-        end_actions=self.end_step_actions,
+        begin_actions=self.begin_step_actions,  # pyrefly: ignore[bad-argument-type]
+        end_actions=self.end_step_actions,  # pyrefly: ignore[bad-argument-type]
     )
     self.loop = action_loop.ActionLoop(
         self.step,
-        begin_actions=self.begin_actions,
-        end_actions=self.end_actions,
+        begin_actions=self.begin_actions,  # pyrefly: ignore[bad-argument-type]
+        end_actions=self.end_actions,  # pyrefly: ignore[bad-argument-type]
     )
 
   def test_action_loop(self):

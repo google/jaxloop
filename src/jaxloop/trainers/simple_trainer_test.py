@@ -68,10 +68,10 @@ class SimpleTrainerTest(absltest.TestCase):
         self.model,
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
-        batch_spec=self.spec,
+        batch_spec=self.spec,  # pyrefly: ignore[bad-argument-type]
     )
 
-    outputs = trainer.train(self.batches)
+    outputs = trainer.train(self.batches)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(
         trainer.model_state.step, self.epochs * self.steps_per_epoch
     )
@@ -86,14 +86,14 @@ class SimpleTrainerTest(absltest.TestCase):
         model,
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
-        batch_spec=self.spec,
+        batch_spec=self.spec,  # pyrefly: ignore[bad-argument-type]
         base_prng={
             'params': jax.random.PRNGKey(0),
             'dropout': jax.random.PRNGKey(1),
         },
     )
 
-    outputs = trainer.train(self.batches)
+    outputs = trainer.train(self.batches)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(
         trainer.model_state.step, self.epochs * self.steps_per_epoch
     )
@@ -106,11 +106,11 @@ class SimpleTrainerTest(absltest.TestCase):
         self.model,
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
-        batch_spec=self.spec,
+        batch_spec=self.spec,  # pyrefly: ignore[bad-argument-type]
         train_loop_class=TestTrainLoop,
     )
 
-    trainer.train(self.batches)
+    trainer.train(self.batches)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(
         trainer.model_state.step, self.epochs * self.steps_per_epoch
     )
@@ -125,13 +125,13 @@ class SimpleTrainerTest(absltest.TestCase):
         self.model,
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
-        batch_spec=self.spec,
+        batch_spec=self.spec,  # pyrefly: ignore[bad-argument-type]
         partitioner=partition.DataParallelPartitioner(
             data_parallel_mesh, 'data'
         ),
     )
 
-    trainer.train(self.batches)
+    trainer.train(self.batches)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(
         trainer.model_state.step, self.epochs * self.steps_per_epoch
     )
@@ -143,7 +143,7 @@ class SimpleTrainerTest(absltest.TestCase):
         self.model,
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
-        batch_spec=self.spec,
+        batch_spec=self.spec,  # pyrefly: ignore[bad-argument-type]
         checkpointing_config=trainer_utils.CheckpointingConfig(
             checkpoint_dir,
             checkpoint_interval=1,
@@ -151,7 +151,7 @@ class SimpleTrainerTest(absltest.TestCase):
         ),
     )
 
-    trainer.train(self.batches)
+    trainer.train(self.batches)  # pyrefly: ignore[bad-argument-type]
     self.assertEqual(
         trainer.model_state.step, self.steps_per_epoch * self.epochs
     )
@@ -164,11 +164,11 @@ class SimpleTrainerTest(absltest.TestCase):
         self.model,
         epochs=self.epochs,
         steps_per_epoch=self.steps_per_epoch,
-        batch_spec=self.spec,
+        batch_spec=self.spec,  # pyrefly: ignore[bad-argument-type]
     )
 
     data_iterator = iter(self.batches)
-    simple_loader = data_loader.SimpleDataLoader(dataset=data_iterator)
+    simple_loader = data_loader.SimpleDataLoader(dataset=data_iterator)  # pyrefly: ignore[bad-argument-type]
 
     outputs = trainer.train(simple_loader)
     self.assertEqual(
