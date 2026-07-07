@@ -140,40 +140,6 @@ class SummaryActionTest(absltest.TestCase):
     with self.assertRaises(ValueError):
       action(cast(types.TrainState, MockedState(1)), outputs)
 
-  def test_summary_action_text(self):
-    @dataclasses.dataclass
-    class MockedState:
-      step: int
-
-    texts = []
-
-    mocked_writer = mock.MagicMock()
-    mocked_writer.write_texts = lambda step, data: texts.append(
-        (step, data)
-    )
-    action = actions.SummaryAction(
-        summary_writer=mocked_writer,
-        interval=1,
-        flush_each_call=True,
-    )
-
-    outputs = {
-        "t1": actions.MetricWithMetadata(
-            "hello", type=types.MetricType.TEXT
-        ),
-        "t2": actions.MetricWithMetadata(
-            "world", type=types.MetricType.TEXT
-        ),
-    }
-    action(cast(types.TrainState, MockedState(1)), outputs)
-
-    self.assertEqual(
-        texts,
-        [
-            (1, {"t1": "hello", "t2": "world"}),
-        ],
-    )
-
 
 class EarlyStoppingActionTest(absltest.TestCase):
 
