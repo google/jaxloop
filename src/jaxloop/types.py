@@ -60,7 +60,7 @@ class MetricWithMetadata:
       "sample_rate" for audio summaries.
   """
 
-  value: Union[Scalar, Array]
+  value: Union[Scalar, Array, str]
   type: MetricType = MetricType.SCALAR
   metadata: dict[str, Any] | None = None
 
