@@ -15,7 +15,7 @@
 """The outer loop library for JAX models."""
 
 import dataclasses
-from typing import Any, Iterable, Iterator, List, Optional, Protocol, Tuple
+from typing import Any, Callable, Iterable, Iterator, List, Optional, Protocol, Tuple
 
 from absl import logging
 from etils import epath
@@ -246,12 +246,8 @@ class OuterLoop:
         transforms=self._checkpoint_spec.transforms,
     )
 
-  def _get_eval_checkpoint_iterator(self) -> Iterator[int]:
-    """Returns an iterator for the eval checkpoint steps.
-
-    Returns:
-      An iterator of checkpoint steps.
-    """
+  def _get_timeout_fn(self) -> Callable[[], bool]:
+    """Returns the timeout function for checkpoint iteration."""
     if self._checkpoint_spec is None:
       raise ValueError('`checkpoint_spec` must be provided.')
 
@@ -262,14 +258,22 @@ class OuterLoop:
       return stopped_file.exists()
 
     if self._checkpoint_spec.iterate_stop_fn is not None:
-      timeout_fn = self._checkpoint_spec.iterate_stop_fn
-    else:
-      timeout_fn = default_timeout_fn
+      return self._checkpoint_spec.iterate_stop_fn
+    return default_timeout_fn
+
+  def _get_eval_checkpoint_iterator(self) -> Iterator[int]:
+    """Returns an iterator for the eval checkpoint steps.
+
+    Returns:
+      An iterator of checkpoint steps.
+    """
+    if self._checkpoint_spec is None:
+      raise ValueError('`checkpoint_spec` must be provided.')
 
     return checkpoint.checkpoint_utils.checkpoints_iterator(
-        checkpoint_dir,
+        self._checkpoint_spec.checkpoint_dir,
         timeout=self._checkpoint_spec.iterate_interval_secs,
-        timeout_fn=timeout_fn,
+        timeout_fn=self._get_timeout_fn(),
     )
 
   def _run_eval_loops(
