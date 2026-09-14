@@ -135,6 +135,13 @@ class Step(Protocol):
 
   _STATE_KEYS = ('step', 'params', 'batch_stats')  # pyrefly: ignore[unannotated-protocol-member]
 
+  # The train state class instantiated by `initialize_model`. Subclasses may
+  # override this to use a `TrainState` subclass, for example one that carries
+  # additional model variables. Overriding this is the supported alternative to
+  # rebinding the module-level `State` symbol, which is process-global and not
+  # safe to mutate.
+  _STATE_CLASS = State  # pyrefly: ignore[unannotated-protocol-member]
+
   def __init__(
       self,
       base_prng: types.PRNGType,
@@ -206,7 +213,7 @@ class Step(Protocol):
 
     def init_fn(batch):
       variables = self._model.init(self._base_prng, batch, **kwargs)
-      return State.create(
+      return self._STATE_CLASS.create(
           apply_fn=self._model.apply,
           tx=self._optimizer,
           **{k: v for k, v in variables.items() if k in self._STATE_KEYS},

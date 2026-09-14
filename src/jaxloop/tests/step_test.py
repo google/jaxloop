@@ -16,7 +16,7 @@
 
 import collections
 import os
-from typing import Optional, Tuple
+from typing import Optional, Tuple, cast
 
 from absl.testing import absltest
 import flax.linen as nn
@@ -173,6 +173,96 @@ class StepTest(absltest.TestCase):
     self.assertEqual(state.step, 1)
     self.assertEqual(self.step.begin_step, 0)
     self.assertEqual(self.step.end_step, 1)
+
+  def test_state_class_defaults_to_train_state(self):
+    self.assertIs(self.step._STATE_CLASS, State)
+    self.assertIsInstance(self.step.initialize_model(self.spec), State)
+
+
+class CustomState(State):
+  """A `TrainState` subclass carrying an extra model variable collection."""
+
+  counters: Optional[dict[str, jnp.ndarray]] = None
+
+  @classmethod
+  def create(cls, *, apply_fn, tx, **variables):
+    known = {
+        k: v
+        for k, v in variables.items()
+        if k in ('params', 'opt_state', 'batch_stats')
+    }
+    extra = {k: v for k, v in variables.items() if k not in known}
+    return super().create(
+        apply_fn=apply_fn, tx=tx, counters=extra or None, **known
+    )
+
+
+class CustomStateModel(nn.Module):
+
+  @nn.compact
+  def __call__(self, inputs):
+    # Registers a non-param variable collection so that `_STATE_KEYS` has
+    # something beyond `params` to forward.
+    counter = self.variable('counters', 'calls', jnp.zeros, ())
+    del counter
+    return nn.Dense(features=2)(inputs['x'])
+
+
+class CustomStateStep(step.Step):
+  """A step that opts into a custom train state via `_STATE_CLASS`."""
+
+  _STATE_CLASS = CustomState
+  _STATE_KEYS = ('step', 'params', 'batch_stats', 'counters')
+
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
+    return state, None
+
+
+class StateClassTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.step = CustomStateStep(
+        jax.random.PRNGKey(0), CustomStateModel(), optimizer=optax.adam(1e-4)
+    )
+    self.spec = jax.tree.map(
+        lambda x: (x.shape, x.dtype), {'x': jnp.ones([2, 3])}
+    )
+
+  def test_initialize_model_uses_the_overridden_state_class(self):
+    state = self.step.initialize_model(self.spec)
+
+    self.assertIsInstance(state, CustomState)
+
+  def test_overridden_state_class_receives_extra_variables(self):
+    # The point of the hook: collections outside the default `_STATE_KEYS` can
+    # be threaded into a custom state without rebinding `step.State`.
+    state = cast(CustomState, self.step.initialize_model(self.spec))
+
+    self.assertIsNotNone(state.counters)
+    self.assertIn('counters', state.counters or {})
+
+  def test_overriding_does_not_affect_the_module_level_state(self):
+    self.step.initialize_model(self.spec)
+
+    self.assertIs(step.State, State)
+
+  def test_other_steps_are_unaffected(self):
+    other = TestStep(
+        jax.random.PRNGKey(0), TestModel(), optimizer=optax.adam(1e-4)
+    )
+    self.step.initialize_model(self.spec)
+
+    batch = {
+        'x': jnp.ones([2, 3]),
+        'y': {'z': jnp.ones([2, 4], dtype=jnp.float16)},
+        'a': jnp.ones(6, dtype=jnp.bfloat16),
+    }
+    state = other.initialize_model(
+        jax.tree.map(lambda x: (x.shape, x.dtype), batch)
+    )
+
+    self.assertNotIsInstance(state, CustomState)
 
 
 if __name__ == '__main__':

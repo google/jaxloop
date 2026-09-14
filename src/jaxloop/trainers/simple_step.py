@@ -75,7 +75,7 @@ class SimpleStep(step.Step):
       variables = self._model.init(
           self._base_prng, self._get_input_features(batch), **kwargs
       )
-      return step.State.create(
+      return self._STATE_CLASS.create(
           apply_fn=self._model.apply,
           tx=self._optimizer,
           **{k: v for k, v in variables.items() if k in self._STATE_KEYS},
