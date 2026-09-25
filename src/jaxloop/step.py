@@ -406,10 +406,15 @@ class Step(Protocol):
         loop.
       log_num_flops: Whether to log the number of flops of the jitted `run`
         function.
-      **kwargs: Additional keyword arguments for running the step.
+      **kwargs: Additional keyword arguments for running the step. These are
+        forwarded to the jitted `run`, so they must be acceptable to it; note
+        that `jax.jit` rejects keyword arguments outright once the partitioner
+        has compiled `run` with `in_shardings`.
         batch_preprocessed (optional args in kwargs): whether the batch was
-        already preprocessed. If True, the batch will not be preprocessed again
-        (e.g. could be done as a performance optimization)
+          already preprocessed. If True, the batch will not be preprocessed
+          again (e.g. could be done as a performance optimization). This one is
+          an instruction to this method rather than an argument to the model, so
+          it is consumed here and is *not* forwarded to `run`.
 
     Returns:
       A tuple of the model state and output.
@@ -417,7 +422,14 @@ class Step(Protocol):
     if self._cached_run is None:
       self.compile()
 
-    if not kwargs.get('batch_preprocessed', False):
+    # `pop`, not `get`: `kwargs` is forwarded verbatim to `self._cached_run`
+    # below, which is `run` under `jax.jit`. Leaving the flag in place sends it
+    # into the compiled function, where every partitioner other than
+    # `SingleDevicePartitioner` supplies `in_shardings` and pjit then rejects
+    # any keyword argument at all (`pjit does not support kwargs when
+    # in_shardings is specified`). Even on a single device it lands in `run`,
+    # and on down into the model, as an argument neither of them asked for.
+    if not kwargs.pop('batch_preprocessed', False):
       batch = self.preprocess_batch(batch)
     if self._should_shard_batch:
       batch = self.shard_batch(batch)

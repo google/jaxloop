@@ -77,6 +77,25 @@ class TestStep(step.Step):
     return super().end(state, outputs)
 
 
+class RecordingStep(TestStep):
+  """A step that records whether it preprocessed and how `run` was invoked."""
+
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.preprocessed = []
+    self.run_kwarg_names = []
+
+  def preprocess_batch(self, batch: Batch) -> Batch:
+    self.preprocessed.append(batch)
+    return super().preprocess_batch(batch)
+
+  def run(self, state: State, batch: Batch, **kwargs) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
+    # Names only: `run` is traced, so the values here are JAX tracers, and
+    # holding one past the trace is a leak.
+    self.run_kwarg_names.append(sorted(kwargs))
+    return state.replace(step=state.step + 1), None
+
+
 class StepTest(absltest.TestCase):
 
   def setUp(self):
@@ -177,6 +196,50 @@ class StepTest(absltest.TestCase):
   def test_state_class_defaults_to_train_state(self):
     self.assertIs(self.step._STATE_CLASS, State)
     self.assertIsInstance(self.step.initialize_model(self.spec), State)
+
+  def _recording_step(self) -> RecordingStep:
+    return RecordingStep(
+        jax.random.PRNGKey(0), self.model, optimizer=optax.adam(1e-4)
+    )
+
+  def test_step_preprocesses_the_batch_by_default(self):
+    recording = self._recording_step()
+    state = recording.initialize_model(self.spec)
+    recording.preprocessed.clear()  # `initialize_model` prepares its own batch.
+
+    recording(state, self.batch)  # pyrefly: ignore[bad-argument-type]
+
+    self.assertLen(recording.preprocessed, 1)
+
+  def test_step_skips_preprocessing_when_the_batch_is_already_prepared(self):
+    recording = self._recording_step()
+    state = recording.initialize_model(self.spec)
+    recording.preprocessed.clear()
+
+    recording(state, self.batch, batch_preprocessed=True)  # pyrefly: ignore[bad-argument-type]
+
+    self.assertEmpty(recording.preprocessed)
+
+  def test_step_consumes_the_preprocessing_flag_rather_than_forwarding_it(self):
+    # `batch_preprocessed` directs this method; it is not an argument to the
+    # model. `run` is jitted and its `**kwargs` reach the model, so forwarding
+    # the flag breaks two ways: pjit refuses keyword arguments outright once a
+    # partitioner compiles `run` with `in_shardings`, and a model that does not
+    # declare `**kwargs` raises `TypeError` even on a single device.
+    recording = self._recording_step()
+    state = recording.initialize_model(self.spec)
+
+    recording(state, self.batch, batch_preprocessed=True)  # pyrefly: ignore[bad-argument-type]
+
+    self.assertEqual(recording.run_kwarg_names, [[]])
+
+  def test_step_forwards_other_keyword_arguments_to_run(self):
+    recording = self._recording_step()
+    state = recording.initialize_model(self.spec)
+
+    recording(state, self.batch, batch_preprocessed=True, extra=7)  # pyrefly: ignore[bad-argument-type]
+
+    self.assertEqual(recording.run_kwarg_names, [['extra']])
 
 
 class CustomState(State):
