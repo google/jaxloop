@@ -84,7 +84,7 @@ class PartitionTest(absltest.TestCase):
     # After explicit sharding propagation, partition sharding becomes TrainState
     # which contains sharding annotations of all parameters at tree leaves.
     self.assertEqual(
-        spmd_partitioner.sharding.params["Dense_0"]["kernel"],  # pytype: disable=attribute-error
+        spmd_partitioner.sharding.params["Dense_0"]["kernel"],  # pyrefly: ignore[missing-attribute]
         sharding.NamedSharding(spmd_mesh, sharding.PartitionSpec()),
     )
 

@@ -526,6 +526,6 @@ class Step(Protocol):
         args=ocp.args.Composite(**{
             self._chkpt_item_name: ocp.args.PyTreeRestore(
                 abstract_state, **restore_kwargs
-            )  # pytype: disable=wrong-arg-count
+            )
         }),
     )[self._chkpt_item_name]

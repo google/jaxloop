@@ -89,7 +89,7 @@ class RecordingStep(TestStep):
     self.preprocessed.append(batch)
     return super().preprocess_batch(batch)
 
-  def run(self, state: State, batch: Batch, **kwargs) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
+  def run(self, state: State, batch: Batch, **kwargs) -> Tuple[State, Optional[Output]]:
     # Names only: `run` is traced, so the values here are JAX tracers, and
     # holding one past the trace is a leak.
     self.run_kwarg_names.append(sorted(kwargs))

@@ -168,7 +168,7 @@ class TransformerStep(simple_step.SimpleStep):
           {"params": params},
           input_features,  # Pass the whole dict
           train=self._train,
-          rngs=self.prng_key(state.step),  # Use step-dependent PRNG key  # pyrefly: ignore[bad-argument-type]
+          rngs=self.prng_key(state.step),  # Use step-dependent PRNG key
       )
 
       labels = output_features["labels"]
