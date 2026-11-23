@@ -178,6 +178,57 @@ class OuterLoop:
     self._train_loop = train_loop
     self._eval_loops = eval_loops
     self._checkpoint_spec = checkpoint_spec
+    self._check_continuous_checkpoint_managers()
+
+  def _continuous_checkpoint_actions(
+      self,
+  ) -> list[actions.ContinuousCheckpointAction]:
+    """Returns the `ContinuousCheckpointAction`s in the train step end actions."""
+    if self._train_loop is None:
+      return []
+    # Custom step types may not define `end_actions`.
+    step_end_actions = getattr(self._train_loop.step, 'end_actions', None)
+    return [
+        action
+        for action in step_end_actions or []
+        if isinstance(action, actions.ContinuousCheckpointAction)
+    ]
+
+  def _check_continuous_checkpoint_managers(self) -> None:
+    """Raises on a misplaced or shared `ContinuousCheckpointAction`.
+
+    The action only works as a train step end action. A train loop
+    `CheckpointAction` must not use the same manager or directory, since it
+    can hit steps that the step action already saved.
+    """
+    if self._train_loop is None:
+      return
+    loop_actions = self._train_loop.end_actions or []
+    if any(
+        isinstance(action, actions.ContinuousCheckpointAction)
+        for action in loop_actions
+    ):
+      raise ValueError(
+          '`ContinuousCheckpointAction` must be a train step end action'
+          ' (`Step(end_actions=...)`), not a train loop end action.'
+      )
+    continuous_managers = [
+        action.ckpt_manager for action in self._continuous_checkpoint_actions()
+    ]
+    for action in loop_actions:
+      if not isinstance(action, actions.CheckpointAction):
+        continue
+      if any(
+          action.ckpt_manager is m
+          or action.ckpt_manager.directory == m.directory
+          for m in continuous_managers
+      ):
+        raise ValueError(
+            'A train loop `CheckpointAction` uses the same `CheckpointManager`'
+            ' or directory as a `ContinuousCheckpointAction` in the train step.'
+            ' Give each action its own manager and directory, or use only'
+            ' `ContinuousCheckpointAction`.'
+        )
 
   def _run_precheck(
       self,
@@ -422,6 +473,16 @@ class OuterLoop:
               state, spec.dataset_iterator or iter(spec.dataset), spec.num_steps
           )
           stop_loop = stop_loop or self._get_stop_loop(eval_outputs)
+
+    # Save the last step for `ContinuousCheckpointAction`s in the step end
+    # actions, then close their managers. `finalize()` stores the last step's
+    # outputs, matching the other saves of that action. The manager is closed
+    # even if `finalize()` raises.
+    for action in self._continuous_checkpoint_actions():
+      try:
+        action.finalize(state)
+      finally:
+        action.ckpt_manager.close()
 
     # Make sure that the CheckpointManager is properly closed, and all the write
     # in threads are committed.

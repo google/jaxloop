@@ -214,6 +214,142 @@ class CheckpointAction(Action):
       )
 
 
+class ContinuousCheckpointAction(CheckpointAction):
+  """Calls `CheckpointManager.save()` at the end of every step.
+
+  Use it as a `Step` end action. The manager's save decision policies decide
+  when to save; build them with
+  `ocp.checkpoint_managers.continuous_checkpointing_options()`. Steps that
+  don't save don't wait for the device. `OuterLoop` calls `finalize()` at the
+  end of training.
+
+  The action must run once per step (`Step` end action with `interval=1`), and
+  `state.step` must grow by one per call. It counts steps on the host and reads
+  `state.step` only on save steps, so a caller that skips steps can miss target
+  steps.
+
+  Give the action its own `CheckpointManager`. `OuterLoop` raises an error if a
+  train loop `CheckpointAction` uses the same manager or directory.
+
+  Each save step evaluates the save decision policies twice: once before
+  reading `state.step` and once inside `CheckpointManager.save()`.
+  """
+
+  # Tells `Step` not to wait for the outputs. Steps that don't save never read
+  # them.
+  wait_for_outputs = False
+
+  def __init__(self, ckpt_manager: ocp.CheckpointManager):
+    """Initializes the action.
+
+    Args:
+      ckpt_manager: The checkpoint manager. Its save decision policies decide on
+        each step whether to save.
+    """
+    super().__init__(ckpt_manager, interval=1)
+    self._host_step: Optional[int] = None
+    self._last_outputs: Optional[Output] = None
+
+  def save(
+      self,
+      step: int,
+      state: State,
+      outputs: Optional[Output],
+      force: bool = False,
+  ) -> bool:
+    """Saves `state` as `step`. `finalize()` calls it with `force=True`.
+
+    Override this to change what is saved; both `__call__` and `finalize()`
+    use it, so overrides must accept `force`.
+
+    Args:
+      step: The step to save.
+      state: The model state.
+      outputs: One step's outputs. They are passed to the manager as metrics
+        unchanged. Orbax uses metrics only if the manager has a `best_fn`. With
+        a `best_fn` and array outputs, override `save()` to convert them to
+        Python values, for example with `jax.device_get` and `tolist`.
+      force: Save even if the save decision policies decline.
+
+    Returns:
+      Whether a save was started.
+    """
+    return self._ckpt_manager.save(
+        step,
+        metrics=outputs,
+        args=ocp.args.PyTreeSave(state),
+        force=force,
+    )
+
+  def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:
+    # Keeps a reference only; `finalize()` stores the last step's outputs.
+    self._last_outputs = outputs
+    if self._host_step is None:
+      # One device read, on the first call only.
+      self._host_step = int(state.step)
+    else:
+      self._host_step += 1
+    # Steps that don't save stop here, without reading the device.
+    if not self._ckpt_manager.should_save(self._host_step):
+      return
+    # Read the device step before saving, so a checkpoint is never written
+    # under the wrong step. This catches callers that skip steps.
+    device_step = int(state.step)
+    if device_step != self._host_step:
+      logging.error(
+          "ContinuousCheckpointAction host step %d does not match state.step"
+          " %d. Make sure the action runs once per training step. Using"
+          " state.step.",
+          self._host_step,
+          device_step,
+      )
+      self._host_step = device_step
+    step = self._host_step
+    if not self.save(step, state, outputs):
+      return
+    logging.info(
+        "Saved checkpoint to %s on step %d.",
+        self._ckpt_manager.directory,
+        step,
+    )
+
+  def finalize(self, state: State, outputs: Optional[Output] = None) -> bool:
+    """Saves the final step if it is not saved yet, then waits for saves.
+
+    Call this on all hosts when training ends. It does not close the manager.
+    If the action never ran (no training step ran), it saves nothing.
+
+    Args:
+      state: The final model state.
+      outputs: One step's outputs to store as metrics. Defaults to the outputs
+        of the last step the action saw, so all saves store the same kind of
+        metrics.
+
+    Returns:
+      Whether this call started a save.
+    """
+    # Let in-flight saves finish, or roll back, before reading the latest step.
+    self._ckpt_manager.wait_until_finished()
+    if self._host_step is None:
+      return False
+    if outputs is None:
+      outputs = self._last_outputs
+    step = int(state.step)
+    latest = self._ckpt_manager.latest_step()
+    saved = False
+    if latest is None or latest < step:
+      saved = self.save(step, state, outputs, force=True)
+      if saved:
+        logging.info(
+            "Saved final checkpoint to %s on step %d.",
+            self._ckpt_manager.directory,
+            step,
+        )
+      self._ckpt_manager.wait_until_finished()
+    self._host_step = step
+    return saved
+
+
 class StepNumberAction(Action):
   """Action to write the step number."""
 

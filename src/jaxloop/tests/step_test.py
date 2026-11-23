@@ -17,11 +17,13 @@
 import collections
 import os
 from typing import Optional, Tuple, cast
+from unittest import mock
 
 from absl.testing import absltest
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
+from jaxloop import actions
 from jaxloop import partition
 from jaxloop import step
 from jaxloop import types
@@ -240,6 +242,99 @@ class StepTest(absltest.TestCase):
     recording(state, self.batch, batch_preprocessed=True, extra=7)  # pyrefly: ignore[bad-argument-type]
 
     self.assertEqual(recording.run_kwarg_names, [['extra']])
+
+
+class ActionStep(step.Step):
+  """A step that only increments the step counter."""
+
+  def run(self, state: State, batch: Batch) -> Tuple[State, Optional[Output]]:  # pyrefly: ignore[bad-override]
+    return state.replace(step=state.step + 1), None
+
+
+class CountingAction(actions.Action):
+  """Counts calls; optionally opts out of the end-action wait."""
+
+  def __init__(self, wait_for_outputs: Optional[bool] = None):
+    super().__init__(interval=1)
+    if wait_for_outputs is not None:
+      self.wait_for_outputs = wait_for_outputs
+    self.calls = 0
+
+  def __call__(self, state: State, outputs: Optional[Output], **kwargs) -> None:
+    self.calls += 1
+
+
+class EndActionTest(absltest.TestCase):
+
+  def setUp(self):
+    super().setUp()
+    self.model = TestModel()
+    x = jnp.ones([2, 3])
+    self.batch = {
+        'x': x,
+        'y': {'z': jnp.ones([2, 4], dtype=jnp.float16)},
+        'a': jnp.ones(6, dtype=jnp.bfloat16),
+    }
+    self.spec = jax.tree.map(lambda x: (x.shape, x.dtype), self.batch)
+    self.checkpoint_dir = os.path.join(
+        self.create_tempdir().full_path, 'checkpoint'
+    )
+
+  def _step(self, end_actions):
+    return ActionStep(
+        jax.random.PRNGKey(0),
+        self.model,
+        optimizer=optax.adam(1e-4),
+        end_actions=end_actions,
+    )
+
+  def _count_waits(self, action) -> int:
+    s = self._step([action])
+    state = s.initialize_model(self.spec)
+    with mock.patch.object(
+        jax, 'block_until_ready', wraps=jax.block_until_ready
+    ) as wait:
+      for _ in range(3):
+        state, _ = s(state, self.batch)  # pyrefly: ignore[bad-argument-type]
+      self.assertEqual(action.calls, 3)
+      return wait.call_count
+
+  def test_end_action_waits_for_outputs_by_default(self):
+    self.assertEqual(self._count_waits(CountingAction()), 3)
+
+  def test_end_action_can_opt_out_of_waiting(self):
+    self.assertEqual(self._count_waits(CountingAction(False)), 0)
+
+  def _manager(self):
+    return checkpoint.CheckpointManager(
+        self.checkpoint_dir,
+        options=checkpoint.CheckpointManagerOptions(
+            save_decision_policy=checkpoint.checkpoint_managers.FixedIntervalPolicy(
+                3
+            )
+        ),
+    )
+
+  def test_continuous_checkpoint_action_resumes_after_restart(self):
+    with self._manager() as mngr:
+      s = self._step([actions.ContinuousCheckpointAction(mngr)])
+      state = s.initialize_model(self.spec)
+      for _ in range(7):
+        state, _ = s(state, self.batch)  # pyrefly: ignore[bad-argument-type]
+      mngr.wait_until_finished()
+      self.assertEqual(mngr.all_steps(), [3, 6])
+
+    # Restart: new manager, action and step; restore the latest save.
+    with self._manager() as mngr:
+      s = self._step([actions.ContinuousCheckpointAction(mngr)])
+      state = s.initialize_model(self.spec)
+      state = s.restore_model(state, self.checkpoint_dir)
+      self.assertEqual(int(state.step), 6)
+      for _ in range(4):
+        state, _ = s(state, self.batch)  # pyrefly: ignore[bad-argument-type]
+      mngr.wait_until_finished()
+      self.assertEqual(int(state.step), 10)
+      self.assertEqual(mngr.all_steps(), [3, 6, 9])
 
 
 class CustomState(State):

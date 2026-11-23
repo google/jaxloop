@@ -128,7 +128,8 @@ class Step(Protocol):
     end_actions: The actions to be run at the end of the step. Note, including
       such actions, when triggered on a particular step, will require all JAX
       computations to be finished before the action can be invoked. This can
-      cause a slight performance penalty for such steps.
+      cause a slight performance penalty for such steps. An action that sets
+      `wait_for_outputs = False` skips this wait.
     chkpt_item_name: The name of the checkpoint item to be restored. See Orbax
       Checkpointer for more details.
   """
@@ -376,7 +377,9 @@ class Step(Protocol):
     if self._end_actions is not None:
       for action in self._end_actions:
         if step % action.interval == 0:
-          jax.block_until_ready(outputs)
+          # Actions with `wait_for_outputs = False` skip this wait.
+          if getattr(action, 'wait_for_outputs', True):
+            jax.block_until_ready(outputs)
           action(state, outputs)
 
   def shard_batch(self, batch: Batch) -> Batch:
@@ -494,6 +497,10 @@ class Step(Protocol):
   @property
   def model(self) -> nn.Module:
     return self._model
+
+  @property
+  def end_actions(self) -> Optional[list[actions.Action]]:
+    return self._end_actions
 
   def _latest_step(
       self,
